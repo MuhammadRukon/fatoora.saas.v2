@@ -1,22 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import {
-  IconBrandBooking,
-  IconBrandProducthunt,
-  IconCash,
-  IconCategory,
-  IconDashboard,
-  IconDiscount,
-  IconReceipt,
-  IconSettings,
-  IconShieldCheck,
-  IconUsers,
-  type Icon,
-} from '@tabler/icons-react';
+import Link from 'next/link';
+import { IconDashboard, IconUsers, type Icon } from '@tabler/icons-react';
 
 import { NavMain } from '@/components/nav-main';
-import { NavSecondary } from '@/components/nav-secondary';
 import { NavUser } from '@/components/nav-user';
 import {
   Sidebar,
@@ -27,7 +15,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { Logo } from '@/app/common/logo/logo.atom';
 
 interface AppSidebarUser {
   name: string;
@@ -41,18 +28,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 const navMain: { title: string; url: string; icon: Icon }[] = [
   { title: 'Dashboard', url: '/dashboard', icon: IconDashboard },
-  { title: 'Orders', url: '/dashboard/orders', icon: IconReceipt },
-  { title: 'Payments', url: '/dashboard/payments', icon: IconCash },
-  { title: 'Warranty', url: '/dashboard/warranty', icon: IconShieldCheck },
-  { title: 'Products', url: '/dashboard/products', icon: IconBrandProducthunt },
-  { title: 'Categories', url: '/dashboard/categories', icon: IconCategory },
-  { title: 'Brands', url: '/dashboard/brands', icon: IconBrandBooking },
-  { title: 'Coupons', url: '/dashboard/coupons', icon: IconDiscount },
   { title: 'Users', url: '/dashboard/users', icon: IconUsers },
-];
-
-const navSecondary: { title: string; url: string; icon: Icon }[] = [
-  { title: 'Settings', url: '/dashboard/settings', icon: IconSettings },
 ];
 
 export function DashboardSidebar({ user, ...props }: AppSidebarProps) {
@@ -62,14 +38,15 @@ export function DashboardSidebar({ user, ...props }: AppSidebarProps) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1.5">
-              <Logo alt="logo" className="w-full h-12 object-contain" />
+              <Link href="/" className="text-lg font-semibold">
+                Fatoora
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navMain} />
-        <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} />

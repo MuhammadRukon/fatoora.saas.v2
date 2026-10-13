@@ -8,21 +8,9 @@ import { SessionProvider, useSession } from 'next-auth/react';
 import { Toaster } from '@/components/ui/sonner';
 import { readAuthHint, setAuthHint } from '@/lib/auth-hint';
 import { makeQueryClient } from '@/lib/queryClient';
-import { useGuestCartMerge } from '@/modules/cart/hooks';
-
-/**
- * Mounts the one-time effect that merges any persisted guest cart
- * into the server cart immediately after sign-in. Lives here so no
- * individual cart consumer (page, panel, header) has to remember to
- * mount it themselves.
- */
-function CartBootstrap(): null {
-  useGuestCartMerge();
-  return null;
-}
 
 // Pages that need the session on first paint: always the normal mount fetch.
-const SESSION_PATHS = /^\/(login|account|orders|checkout)(\/|$)/;
+const SESSION_PATHS = /^\/login(\/|$)/;
 
 /**
  * SessionProvider mounts with `session={null}` (no request) unless the page needs
@@ -46,7 +34,7 @@ export function AuthHintSync(): null {
   }, []);
 
   // Set only: a null session also means a transient network/5xx error (next-auth swallows it).
-  // A forged hint is cleared by the 401 of the cart summary query; logout clears it too.
+  // Logout clears the hint.
   useEffect(() => {
     if (status === 'authenticated') setAuthHint();
   }, [status]);
@@ -57,7 +45,7 @@ export function AuthHintSync(): null {
 /**
  * Root client providers. Mounted once in the app root layout so that
  * session, theme, query cache, and toaster are shared across every
- * route group (storefront, admin, auth).
+ * route group (public, admin, auth).
  */
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => makeQueryClient());
@@ -73,7 +61,6 @@ export function Providers({ children }: { children: ReactNode }) {
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
         <QueryClientProvider client={queryClient}>
           <AuthHintSync />
-          <CartBootstrap />
           {children}
           <Toaster duration={2000} />
         </QueryClientProvider>

@@ -21,7 +21,7 @@ import { signupSchema, type SignupInput } from '@/contracts/auth';
 import { signupAction } from '@/modules/auth/actions';
 import { AuthCard } from '@/modules/auth/components/auth-card';
 import { GoogleButton } from '@/modules/auth/components/google-button';
-import { Loader } from '@/app/common/loader/loader';
+import { Loader } from '@/components/common/loader';
 
 export default function SignupPage() {
   const router = useRouter();

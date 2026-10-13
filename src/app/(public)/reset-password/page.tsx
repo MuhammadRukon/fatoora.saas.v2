@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { resetPasswordSchema, type ResetPasswordInput } from '@/contracts/auth';
 import { resetPasswordAction } from '@/modules/auth/actions';
 import { AuthCard } from '@/modules/auth/components/auth-card';
-import { Loader } from '@/app/common/loader/loader';
+import { Loader } from '@/components/common/loader';
 
 function ResetPasswordContent() {
   const router = useRouter();

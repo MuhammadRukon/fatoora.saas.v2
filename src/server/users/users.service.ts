@@ -13,21 +13,25 @@ function sanitizeImage(image: string | null | undefined): string | null {
   return image?.trim() ? image.trim() : null;
 }
 
+const adminUserSelect = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  image: true,
+  role: true,
+  emailVerified: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.UserSelect;
+
+export type AdminUser = Prisma.UserGetPayload<{ select: typeof adminUserSelect }>;
+
 export const usersService = {
   listAdminUsers() {
     return prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        image: true,
-        role: true,
-        emailVerified: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: adminUserSelect,
     });
   },
 
@@ -42,17 +46,7 @@ export const usersService = {
           role: input.role,
           passwordHash: input.password ? await hashPassword(input.password) : null,
         },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          phone: true,
-          image: true,
-          role: true,
-          emailVerified: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+        select: adminUserSelect,
       });
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -72,17 +66,7 @@ export const usersService = {
           image: sanitizeImage(input.image),
           role: input.role,
         },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          phone: true,
-          image: true,
-          role: true,
-          emailVerified: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+        select: adminUserSelect,
       });
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {

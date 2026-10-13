@@ -20,7 +20,6 @@ vi.mock('next-auth/react', () => ({
   useSession: () => ({ status: session.status, update: session.update }),
 }));
 vi.mock('next/navigation', () => ({ usePathname: () => '/' }));
-vi.mock('@/modules/cart/hooks', () => ({ useGuestCartMerge: () => undefined }));
 
 import { clearAuthHint, readAuthHint, setAuthHint } from '@/lib/auth-hint';
 import { AuthHintSync } from '../providers';

@@ -52,19 +52,6 @@ export class ConflictError extends AppError {
   }
 }
 
-/**
- * A customer transaction id is already attached to another payment (409, with
- * its own code so clients can show specific copy). Not a ConflictError: the
- * code, not the class, is what the wire and the UI key on. Customer-facing
- * throws carry no `meta`; admin throws carry
- * `{ existingOrderId, existingOrderNumber }`.
- */
-export class TxnIdDuplicateError extends AppError {
-  constructor(message = 'Transaction ID already exists', meta?: Record<string, unknown>) {
-    super('TXN_ID_DUPLICATE', message, meta);
-  }
-}
-
 export class ValidationError extends AppError {
   constructor(message = 'Validation failed', meta?: Record<string, unknown>) {
     super('VALIDATION_ERROR', message, meta);
