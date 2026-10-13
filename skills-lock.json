@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "product-marketing": {
+      "source": "coreyhaines31/marketingskills",
+      "sourceType": "github",
+      "skillPath": "skills/product-marketing/SKILL.md",
+      "computedHash": "709145cb3cd36bab03d5dfe4ecd41af3120ed5a9d293c7ba9d7d9648c39f34b9"
+    },
+    "seo": {
+      "source": "addyosmani/web-quality-skills",
+      "sourceType": "github",
+      "skillPath": "skills/seo/SKILL.md",
+      "computedHash": "aa081d7ee9f44d1b09ac521051630adac2fca0e595e3d0d0ec881d0b2644676f"
+    },
+    "seo-audit": {
+      "source": "coreyhaines31/marketingskills",
+      "sourceType": "github",
+      "skillPath": "skills/seo-audit/SKILL.md",
+      "computedHash": "71435fbaf3622f1a6b16e20fda15f19aa8e285c9914fdeb92ac0a7612d6317bb"
+    }
+  }
+}
