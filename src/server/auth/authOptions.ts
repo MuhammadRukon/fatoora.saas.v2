@@ -131,7 +131,7 @@ export const authOptions: NextAuthConfig = {
   callbacks: {
     async signIn({ user, account }) {
       // For Google sign-ins, ensure a User row exists so the rest of the
-      // app (orders, cart, reviews) has a stable FK target. We do not
+      // app has a stable FK target. We do not
       // store Google's account row separately in JWT mode - the link is
       // by email.
       //

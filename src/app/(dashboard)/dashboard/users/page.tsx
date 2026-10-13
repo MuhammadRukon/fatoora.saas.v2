@@ -33,18 +33,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Modal } from '@/app/components/modal/modal';
-import { useAdminUserMutations, useAdminUsers } from '@/modules/admin/catalog/hooks';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { useAdminUserMutations, useAdminUsers } from '@/modules/admin/users/hooks';
 import {
   adminUserCreateSchema,
   type AdminUserCreateInput,
   type AdminUserUpdateInput,
 } from '@/contracts/admin-users';
-import { AdminUser } from '@/server/catalog/catalog.repo';
+import type { AdminUser } from '@/server/users/users.service';
 
 const ROLE_OPTIONS: Array<{ value: UserRole; label: string }> = [
   { value: UserRole.ADMIN, label: 'Admin' },
-  { value: UserRole.CUSTOMER, label: 'Customer' },
+  { value: UserRole.USER, label: 'User' },
 ];
 
 const defaultValues: AdminUserCreateInput = {
@@ -52,7 +52,7 @@ const defaultValues: AdminUserCreateInput = {
   email: '',
   phone: '',
   image: '',
-  role: UserRole.CUSTOMER,
+  role: UserRole.USER,
   password: '',
 };
 
@@ -188,16 +188,19 @@ export default function AdminUsersPage() {
         columns={columns}
         data={isLoading ? [] : users}
       />
-      <Modal
-        title={editing ? 'Edit User' : 'Add User'}
-        isOpen={open}
-        onChange={(isOpen) => {
+      <Dialog
+        open={open}
+        onOpenChange={(isOpen) => {
           if (!isOpen) {
             setOpen(false);
             setEditing(null);
           }
         }}
       >
+        <DialogContent onInteractOutside={(e) => e.preventDefault()}>
+        <DialogTitle>{editing ? 'Edit User' : 'Add User'}</DialogTitle>
+        <DialogDescription />
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -310,7 +313,8 @@ export default function AdminUsersPage() {
             </Button>
           </form>
         </Form>
-      </Modal>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

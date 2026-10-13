@@ -22,7 +22,7 @@ import { setAuthHint } from '@/lib/auth-hint';
 import { credentialsSchema, type CredentialsInput } from '@/contracts/auth';
 import { AuthCard } from '@/modules/auth/components/auth-card';
 import { GoogleButton } from '@/modules/auth/components/google-button';
-import { Loader } from '@/app/common/loader/loader';
+import { Loader } from '@/components/common/loader';
 
 function LoginContent() {
   const router = useRouter();

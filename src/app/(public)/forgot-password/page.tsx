@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input';
 import { forgotPasswordSchema, type ForgotPasswordInput } from '@/contracts/auth';
 import { forgotPasswordAction } from '@/modules/auth/actions';
 import { AuthCard } from '@/modules/auth/components/auth-card';
-import { Loader } from '@/app/common/loader/loader';
+import { Loader } from '@/components/common/loader';
 
 export default function ForgotPasswordPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);

@@ -5,7 +5,7 @@ import { getToken } from 'next-auth/jwt';
 /**
  * Edge guard for admin-only routes. Verifies the JWT (role is baked in
  * at sign-in, see authOptions.ts `jwt` callback) rather than just
- * checking that a session cookie exists — a CUSTOMER's valid session
+ * checking that a session cookie exists — a USER's valid session
  * no longer passes this check. This is verification only, not
  * revocation: a demoted admin's existing token still passes until it
  * expires. Route-level `requireAdminSession()` and the dashboard
@@ -33,7 +33,7 @@ export default async function proxy(req: NextRequest) {
   });
   // Admin routes require the ADMIN role; /account only requires any
   // authenticated user. Verifying the JWT here (not just cookie
-  // presence) means a CUSTOMER token can't reach admin routes.
+  // presence) means a USER token can't reach admin routes.
   const authorized = needsAdmin ? !!token && token.role === 'ADMIN' : !!token;
 
   if (!authorized) {

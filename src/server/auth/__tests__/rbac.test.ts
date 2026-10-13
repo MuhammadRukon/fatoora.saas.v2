@@ -11,7 +11,7 @@ describe('rbac: requireUser', () => {
   });
 
   it('returns the user when present', () => {
-    const user = { id: 'u1', role: 'CUSTOMER' as const };
+    const user = { id: 'u1', role: 'USER' as const };
     expect(requireUser(user)).toBe(user);
   });
 });
@@ -22,7 +22,7 @@ describe('rbac: requireAdmin', () => {
   });
 
   it('throws ForbiddenError for a non-admin user', () => {
-    expect(() => requireAdmin({ id: 'u1', role: 'CUSTOMER' })).toThrow(ForbiddenError);
+    expect(() => requireAdmin({ id: 'u1', role: 'USER' })).toThrow(ForbiddenError);
   });
 
   it('returns the user for an admin', () => {

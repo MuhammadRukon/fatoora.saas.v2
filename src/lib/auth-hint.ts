@@ -3,7 +3,7 @@
  * whether the client asks for a session on load; it is never used for
  * authorization (every API still calls requireSession()). No PII.
  */
-const KEY = 'Cryptech.authHint';
+const KEY = 'fatoora.authHint';
 
 /** null on the server or when storage is blocked: the hint is only an optimization. */
 function store(): Storage | null {

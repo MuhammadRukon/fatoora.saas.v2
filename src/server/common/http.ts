@@ -15,7 +15,7 @@ export interface SessionUser {
   id: string;
   email: string;
   name: string;
-  role: 'ADMIN' | 'CUSTOMER';
+  role: 'ADMIN' | 'USER';
 }
 
 export async function getSessionUser(): Promise<SessionUser | null> {

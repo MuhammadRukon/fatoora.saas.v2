@@ -1,44 +1,28 @@
-import Image from 'next/image';
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
-import { catalogService } from '@/server/catalog/catalog.service';
-import { ProductGrid } from '@/modules/storefront/components/product-grid';
 
 export const metadata = {
-  title: 'Cryptech - gadgets & electronics',
-  description: 'Discover the latest gadgets, laptops, phones and accessories.',
+  title: 'ZATCA e-invoicing',
+  description: 'Issue ZATCA Phase 2 compliant e-invoices for your business.',
   alternates: { canonical: '/' },
 };
 
-export const revalidate = 120;
-
-export default async function HomePage() {
-  const featured = await catalogService.listPublicProducts({ sort: 'newest', limit: 8 });
-
+export default function HomePage() {
   return (
-    <div className="space-y-10 py-6">
-      <h1 className="sr-only">Cryptech — gadgets &amp; electronics in Bangladesh</h1>
-      <Image
-        className="w-full max-h-96 object-cover rounded"
-        src="/banner.webp"
-        loading="eager"
-        alt="Storefront banner"
-        width={2000}
-        height={1000}
-        sizes="100vw"
-        priority
-      />
-
-      <section className="space-y-4">
-        <div className="flex items-end justify-between">
-          <h2 className="text-xl md:text-2xl font-semibold">Featured products</h2>
-          <Button asChild variant="link">
-            <Link href="/products">Browse all</Link>
-          </Button>
-        </div>
-        <ProductGrid products={featured.items} />
-      </section>
+    <div className="flex min-h-[70vh] flex-col items-center justify-center gap-6 text-center">
+      <h1 className="text-3xl font-semibold md:text-4xl">Fatoora</h1>
+      <p className="max-w-md text-muted-foreground">
+        ZATCA Phase 2 e-invoicing for businesses in Saudi Arabia.
+      </p>
+      <div className="flex gap-3">
+        <Button asChild>
+          <Link href="/login">Login</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/signup">Sign up</Link>
+        </Button>
+      </div>
     </div>
   );
 }

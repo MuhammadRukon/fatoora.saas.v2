@@ -41,7 +41,7 @@ export const authService = {
           name: input.name,
           phone: input.phone,
           passwordHash,
-          role: UserRole.CUSTOMER,
+          role: UserRole.USER,
         },
         select: { id: true, email: true, name: true, role: true },
       });
