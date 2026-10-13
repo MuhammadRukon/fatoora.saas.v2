@@ -77,7 +77,7 @@ describe('rateLimit on a Redis-like store', () => {
     expect(seen).toHaveLength(1);
     expect(seen[0]).not.toContain('@');
     expect(seen[0]).not.toContain('1.2.3.4');
-    expect(seen[0]).toMatch(/^gw:[^:]+:rl:[0-9a-f]{32}$/);
+    expect(seen[0]).toMatch(/^fatoora:[^:]+:rl:[0-9a-f]{32}$/);
   });
 
   it('clearRateLimit resets the Redis counter', async () => {

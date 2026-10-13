@@ -197,7 +197,7 @@ export async function cached<T>(
 
 export function buildKey(...parts: (string | number)[]): string {
   const env = process.env.VERCEL_ENV ?? (process.env.NODE_ENV === 'test' ? 'test' : 'local');
-  return `gw:${env}:${parts.join(':')}`;
+  return `fatoora:${env}:${parts.join(':')}`;
 }
 
 function sortKeys(v: unknown): unknown {
