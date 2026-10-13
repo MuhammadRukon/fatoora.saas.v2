@@ -4,4 +4,5 @@
  */
 export const queryKeys = {
   user: ['user'] as const,
+  subscriptionState: ['subscription', 'me'] as const,
 };

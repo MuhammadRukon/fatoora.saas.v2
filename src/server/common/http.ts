@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 
 import { auth } from '@/auth';
 import { ForbiddenError, UnauthorizedError, statusFromError, toJsonError } from './errors';
+import { subscriptionsService } from '@/server/subscriptions/subscriptions.service';
 import { log } from './logger';
 import { RateLimitedError } from './rate-limit';
 
@@ -39,6 +40,19 @@ export async function requireAdminSession(): Promise<SessionUser> {
   const user = await requireSession();
   if (user.role !== 'ADMIN') throw new ForbiddenError('Admin role required');
   return user;
+}
+
+export async function requireUserSession(): Promise<SessionUser> {
+  const user = await requireSession();
+  if (user.role !== 'USER') throw new ForbiddenError('User role required');
+  return user;
+}
+
+/** Gate for every /api/app/** route: a USER with a current ACTIVE subscription (else 402). */
+export async function requireAppSession(): Promise<{ userId: string }> {
+  const user = await requireUserSession();
+  await subscriptionsService.assertActive(user.id);
+  return { userId: user.id };
 }
 
 export function jsonError(err: unknown): NextResponse {
