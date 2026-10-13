@@ -1,0 +1,5 @@
+// Detailed Technical Guideline v2, sec. 6.2: public key (tag 8) and certificate signature (tag 9) bytes.
+export const GUIDELINE_TAG8_HEX =
+  '3056301006072a8648ce3d020106052b8104000a0342000461830ca0e68560084c3bfb2d7a8b5f6726afafaa75d524a5c2c2bd6b39ac2d8edbd5bf852e1a8c02b841d9da8729ba31a8a35fbe428378f869aa3ba2e61727d1';
+export const GUIDELINE_TAG9_HEX =
+  '3046022100ee61d3eb283ce63b50196a7733bb4f4fb264dbececbd51c6b376d4e59ed813af022100fad1e6d06a662362f75e6e716335fc785f8768a7b2ec101142352b0b63420569';
