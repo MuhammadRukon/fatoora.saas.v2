@@ -86,8 +86,8 @@ Forms use react-hook-form + `zodResolver` with the *same* contract schema. Toast
 
 - Roles are the `UserRole` enum `{ADMIN, USER}`. Signup creates `USER`; admins are seed-created.
 - `src/auth.ts` instantiates Auth.js v5 from `src/server/auth/authOptions.ts`. **JWT strategy** — `id` and `role` are baked into the token at sign-in, so role changes only apply after the token refreshes. Credentials login is refused until `emailVerified` is set.
-- `src/proxy.ts` — Next 16's middleware file (named `proxy.ts`, not `middleware.ts`). Verifies the JWT and role at the edge for `/dashboard/*` and `/api/admin/*`. Fast-fail only.
-- **Enforcement of record**: every `/api/admin/**` route calls `requireAdminSession()`, and `(dashboard)/layout.tsx` re-checks `role === 'ADMIN'` server-side. Never rely on the edge guard alone.
+- `src/proxy.ts` — Next 16's middleware file (named `proxy.ts`, not `middleware.ts`). Verifies the JWT and role at the edge for `/dashboard/*` and `/api/admin/*`, and a session for `/app/*`, `/plans`, `/api/app/*` and `/api/subscriptions/*`. Fast-fail only.
+- **Enforcement of record**: every `/api/admin/**` route calls `requireAdminSession()`, and `(dashboard)/layout.tsx` re-checks `role === 'ADMIN'` server-side. Every `/api/app/**` route calls `requireAppSession()` (USER with an ACTIVE subscription, else 402 `SUBSCRIPTION_REQUIRED`), and `(app)/app/layout.tsx` redirects to `/plans` unless ACTIVE. Never rely on the edge guard alone.
 
 ## Conventions
 

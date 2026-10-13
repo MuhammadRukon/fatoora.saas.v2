@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 
 import { apiFetch, ApiClientError } from '@/lib/fetcher';
 import { queryKeys } from '@/constants/queryKeys';
-import type { AdminUserCreateInput, AdminUserUpdateInput } from '@/contracts/admin-users';
+import type { SubscriptionDTO } from '@/contracts/subscriptions';
 import type { AdminUser } from '@/server/users/users.service';
 
 const USERS_URL = '/api/admin/users';
@@ -21,24 +21,15 @@ export function useAdminUsers() {
   });
 }
 
-export function useAdminUserMutations() {
+export function useActivateSubscription() {
   const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: queryKeys.user });
-
-  const create = useMutation({
-    mutationFn: (input: AdminUserCreateInput) =>
-      apiFetch<{ user: AdminUser }>(USERS_URL, { method: 'POST', body: input }),
-    onSuccess: () => toast.success('User created'),
-    onError: (err) => toast.error(explainError(err, 'Could not create user')),
-    onSettled: invalidate,
+  return useMutation({
+    mutationFn: (subscriptionId: string) =>
+      apiFetch<SubscriptionDTO>(`/api/admin/subscriptions/${subscriptionId}/activate`, {
+        method: 'POST',
+      }),
+    onSuccess: () => toast.success('Subscription activated'),
+    onError: (err) => toast.error(explainError(err, 'Could not activate subscription')),
+    onSettled: () => qc.invalidateQueries({ queryKey: queryKeys.user }),
   });
-  const update = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: AdminUserUpdateInput }) =>
-      apiFetch<{ user: AdminUser }>(`${USERS_URL}/${id}`, { method: 'PUT', body: input }),
-    onSuccess: () => toast.success('User updated'),
-    onError: (err) => toast.error(explainError(err, 'Could not update user')),
-    onSettled: invalidate,
-  });
-
-  return { create, update };
 }

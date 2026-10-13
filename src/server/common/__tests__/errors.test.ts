@@ -6,6 +6,7 @@ import {
   ConflictError,
   ForbiddenError,
   NotFoundError,
+  SubscriptionRequiredError,
   UnauthorizedError,
   ValidationError,
   statusFromError,
@@ -19,6 +20,7 @@ describe('errors: statusFromError', () => {
   it('maps domain errors to HTTP status codes', () => {
     expect(statusFromError(new BadRequestError())).toBe(400);
     expect(statusFromError(new UnauthorizedError())).toBe(401);
+    expect(statusFromError(new SubscriptionRequiredError())).toBe(402);
     expect(statusFromError(new ForbiddenError())).toBe(403);
     expect(statusFromError(new NotFoundError())).toBe(404);
     expect(statusFromError(new ConflictError('dup'))).toBe(409);

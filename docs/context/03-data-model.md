@@ -13,7 +13,12 @@ Source of truth: [`prisma/schema.prisma`](../../prisma/schema.prisma). PostgreSQ
 ### Infrastructure
 - **RateLimitBucket**: fixed-window counters (`key` PK, `count`, `resetAt`, index on `resetAt`) behind `src/server/common/rate-limit.ts`.
 
-Subscriptions, businesses, EGS units, customers and documents are added by later plan phases.
+### Subscriptions
+- **Subscription**: `userId` (cascade), `plan` (`MONTH_1 | MONTH_3 | MONTH_6 | MONTH_12`), `status` (`PENDING | ACTIVE`, default `PENDING`), `startsAt`/`endsAt` (null until activated), `activatedAt`, `activatedById` (admin, set null on delete). Index `(userId, status)`.
+  - At most one PENDING row per user: partial unique index `Subscription_one_pending_per_user` (`WHERE status = 'PENDING'`), created in the migration SQL because Prisma cannot express it.
+  - State (`src/server/subscriptions/subscriptions.service.ts`): ACTIVE if any ACTIVE row has `startsAt <= now < endsAt`, else PENDING if a request is open, else EXPIRED if any ACTIVE row ever existed, else NONE. Activation starts at `max(now, latest ACTIVE endsAt)` (stacking) and adds calendar months in UTC, clamped to month end.
+
+Businesses, EGS units, customers and documents are added by later plan phases.
 
 ## Money
 

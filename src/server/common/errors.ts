@@ -34,6 +34,12 @@ export class UnauthorizedError extends AppError {
   }
 }
 
+export class SubscriptionRequiredError extends AppError {
+  constructor(message = 'An active subscription is required') {
+    super('SUBSCRIPTION_REQUIRED', message);
+  }
+}
+
 export class ForbiddenError extends AppError {
   constructor(message = 'Forbidden') {
     super('FORBIDDEN', message);

@@ -22,6 +22,8 @@ model User {
   accounts       Account[]
   passwordResets PasswordResetToken[]
   sessions       Session[]
+  subscriptions  Subscription[]       @relation("SubscriptionUser")
+  activations    Subscription[]       @relation("SubscriptionActivatedBy")
 
   @@index([role])
 }
@@ -78,6 +80,37 @@ model PasswordResetToken {
 enum UserRole {
   USER
   ADMIN
+}
+
+enum SubscriptionPlan {
+  MONTH_1
+  MONTH_3
+  MONTH_6
+  MONTH_12
+}
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+}
+
+/// At most one PENDING row per user: enforced by the partial unique index
+/// "Subscription_one_pending_per_user" in the migration SQL (Prisma can't model it).
+model Subscription {
+  id            String             @id @default(cuid())
+  userId        String
+  plan          SubscriptionPlan
+  status        SubscriptionStatus @default(PENDING)
+  startsAt      DateTime?
+  endsAt        DateTime?
+  activatedAt   DateTime?
+  activatedById String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  user          User               @relation("SubscriptionUser", fields: [userId], references: [id], onDelete: Cascade)
+  activatedBy   User?              @relation("SubscriptionActivatedBy", fields: [activatedById], references: [id])
+
+  @@index([userId, status])
 }
 
 /// Postgres-backed rate-limit bucket. Replaces the old in-process Map

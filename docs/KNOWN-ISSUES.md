@@ -9,13 +9,11 @@ Verified-open items only, each checked against the code on 2026-10-14. When you 
 ## Architecture
 
 - **Admin user list has no server pagination.** `listAdminUsers` (`src/server/users/users.service.ts`) returns the whole table; `DataTable` paginates client-side.
-- **Single ADMIN role, no last-admin guard.** `updateAdminUser` (`src/server/users/users.service.ts`) lets any admin change any role, including their own. (Plan Phase 2 removes role editing from the admin UI.)
 - **No connection-pool tuning.** `src/lib/prisma.ts` is the bare singleton; if connection errors appear under burst, set a low `connection_limit` or add Prisma Accelerate.
 
 ## Frontend
 
 - **No `loading.tsx` anywhere.** Server pages block with no skeleton.
-- **Admin avatars need a remote image host.** `src/app/(dashboard)/dashboard/users/page.tsx` renders `user.image` with `next/image`, but `next.config.ts` allows no remote hosts, so a user with an image URL (for example a Google avatar) breaks that row.
 
 ## Tooling
 
