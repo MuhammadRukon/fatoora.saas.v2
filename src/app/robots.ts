@@ -7,28 +7,14 @@ function siteUrl(): string {
 }
 
 export default function robots(): MetadataRoute.Robots {
-  const base = siteUrl();
   return {
     rules: [
       {
         userAgent: '*',
         allow: ['/'],
-        // Auth & cart-style URLs have no SEO value and trigger redirects;
-        // we save crawl budget for product pages.
-        disallow: [
-          '/api/',
-          '/dashboard/',
-          '/account/',
-          '/cart',
-          '/checkout',
-          '/login',
-          '/signup',
-          '/forgot-password',
-          '/reset-password',
-        ],
+        disallow: ['/app', '/dashboard', '/api'],
       },
     ],
-    sitemap: `${base}/sitemap.xml`,
-    host: base,
+    host: siteUrl(),
   };
 }

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { authLandingUrl, clearAuthHint, readAuthHint, setAuthHint } from '../auth-hint';
 
-const KEY = 'Cryptech.authHint';
+const KEY = 'fatoora.authHint';
 
 function stubStorage(initial: Record<string, string> = {}) {
   const data = new Map(Object.entries(initial));
