@@ -1,5 +1,7 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
+import { auth } from '@/auth';
 import { Button } from '@/components/ui/button';
 
 export const metadata = {
@@ -8,7 +10,11 @@ export const metadata = {
   alternates: { canonical: '/' },
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Post-login landing (login and Google default to '/'): send each role to its area.
+  const session = await auth();
+  if (session?.user) redirect(session.user.role === 'ADMIN' ? '/dashboard' : '/app');
+
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center gap-6 text-center">
       <h1 className="text-3xl font-semibold md:text-4xl">Fatoora</h1>

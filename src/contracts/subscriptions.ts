@@ -11,6 +11,10 @@ export const PLAN_MONTHS: Record<SubscriptionPlan, number> = {
   MONTH_12: 12,
 };
 
+/** "1 month", "3 months", ... */
+export const planLabel = (plan: SubscriptionPlan) =>
+  `${PLAN_MONTHS[plan]} month${PLAN_MONTHS[plan] === 1 ? '' : 's'}`;
+
 /** Wire shape (dates are ISO strings after JSON serialisation). */
 export const subscriptionSchema = z.object({
   id: z.string(),
