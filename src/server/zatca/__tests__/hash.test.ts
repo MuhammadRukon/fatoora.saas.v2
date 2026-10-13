@@ -1,11 +1,7 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-// Signed simplified invoice shipped by zatca-xml-js (MIT). Its signature block, certificate and QR are the
-// ones printed in the ZATCA Detailed Technical Guideline v2 (sec. 5.2 / 6.2), i.e. an SDK-produced sample.
-import { valid_simplified_invoice_xml_sample } from 'zatca-xml-js/lib/samples';
 import { computeInvoiceHash, PIH_SEED } from '../hash';
-
-const sample = valid_simplified_invoice_xml_sample.trim();
+import { SAMPLE_XML as sample } from './vectors';
 
 describe('computeInvoiceHash', () => {
   it('matches the invoiceSignedData DigestValue embedded in a validator-accepted sample', () => {
