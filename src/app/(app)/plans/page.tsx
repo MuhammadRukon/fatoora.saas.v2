@@ -97,7 +97,7 @@ export default function PlansPage() {
                 <span className="text-muted-foreground">{months === 1 ? 'month' : 'months'}</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                Full access for {planLabel(plan)} from the day it&apos;s activated.
+                {`Full access for ${planLabel(plan)} from the day it's activated.`}
               </p>
               <Button
                 className="mt-auto w-full"

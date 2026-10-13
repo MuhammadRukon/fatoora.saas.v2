@@ -37,7 +37,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
           image: session.user.image,
         }}
       />
-      <SidebarInset>
+      {/* min-w-0: wide tables scroll inside their container, not the page */}
+      <SidebarInset className="min-w-0">
         <SiteHeader />
         <div className="p-4 md:p-6 flex-1">{children}</div>
       </SidebarInset>
