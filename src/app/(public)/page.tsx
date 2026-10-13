@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 export const metadata = {
-  title: 'Fatoora - ZATCA e-invoicing',
+  title: 'ZATCA e-invoicing',
   description: 'Issue ZATCA Phase 2 compliant e-invoices for your business.',
   alternates: { canonical: '/' },
 };
