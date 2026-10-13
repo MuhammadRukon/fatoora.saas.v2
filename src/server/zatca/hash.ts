@@ -23,7 +23,7 @@ export function parseXml(xml: string): Document {
 }
 
 const childElements = (el: Element) =>
-  Array.from({ length: el.childNodes.length }, (_, i) => el.childNodes.item(i)).filter(
+  Array.from({ length: el.childNodes.length }, (_, i) => el.childNodes.item(i)!).filter(
     (n): n is Element => n.nodeType === 1,
   );
 

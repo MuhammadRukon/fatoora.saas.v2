@@ -5,7 +5,7 @@ import { simplifiedInvoice, standardCreditNote, standardInvoice } from './fixtur
 
 const rootChildren = (xml: string) => {
   const root = parseXml(xml).documentElement!;
-  return Array.from({ length: root.childNodes.length }, (_, i) => root.childNodes.item(i))
+  return Array.from({ length: root.childNodes.length }, (_, i) => root.childNodes.item(i)!)
     .filter((n) => n.nodeType === 1)
     .map((n) => n.nodeName);
 };

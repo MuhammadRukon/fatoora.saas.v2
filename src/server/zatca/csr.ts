@@ -109,7 +109,7 @@ export function buildCsr(i: CsrInput): string {
   csr.attributes = [new Attribute({ type: OID.extensionRequest, values: [extensions.toSchema()] })];
 
   csr.signatureAlgorithm = new AlgorithmIdentifier({ algorithmId: OID.ecdsaWithSha256 });
-  csr.tbsView = new Uint8Array(csr.encodeTBS().toBER(false));
+  csr.tbsView = new Uint8Array((csr.toSchema(true) as Sequence).valueBlock.value[0].toBER(false));
   const signature = sign('sha256', csr.tbsView, { key: i.privateKeyPem, dsaEncoding: 'der' });
   csr.signatureValue = new BitString({ valueHex: signature });
 

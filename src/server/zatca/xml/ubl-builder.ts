@@ -151,7 +151,7 @@ const attachment = (value: El) => el('cac:Attachment', [value]);
 
 export function buildUnsignedInvoiceXml(d: ZatcaDocumentInput): string {
   const isNote = d.kind !== 'INVOICE';
-  const delivery = d.supplyDate || d.supplyEndDate;
+  const delivery = !!(d.supplyDate || d.supplyEndDate);
   const children: (El | null | undefined | false)[] = [
     { name: '', raw: UBL_EXTENSIONS_PLACEHOLDER },
     el('cbc:ProfileID', 'reporting:1.0'),
@@ -163,7 +163,7 @@ export function buildUnsignedInvoiceXml(d: ZatcaDocumentInput): string {
     isNote && opt('cbc:Note', d.reason),
     el('cbc:DocumentCurrencyCode', 'SAR'),
     el('cbc:TaxCurrencyCode', 'SAR'),
-    isNote && d.billingReference && el('cac:BillingReference', [el('cac:InvoiceDocumentReference', [el('cbc:ID', d.billingReference)])]),
+    isNote && !!d.billingReference && el('cac:BillingReference', [el('cac:InvoiceDocumentReference', [el('cbc:ID', d.billingReference)])]),
     el('cac:AdditionalDocumentReference', [el('cbc:ID', 'ICV'), el('cbc:UUID', String(d.icv))]),
     el('cac:AdditionalDocumentReference', [
       el('cbc:ID', 'PIH'),
@@ -177,7 +177,7 @@ export function buildUnsignedInvoiceXml(d: ZatcaDocumentInput): string {
     party('cac:AccountingSupplierParty', d.seller),
     party('cac:AccountingCustomerParty', d.buyer),
     delivery && el('cac:Delivery', [opt('cbc:ActualDeliveryDate', d.supplyDate), opt('cbc:LatestDeliveryDate', d.supplyEndDate)]),
-    (d.paymentMeansCode || isNote) &&
+    (!!d.paymentMeansCode || isNote) &&
       el('cac:PaymentMeans', [opt('cbc:PaymentMeansCode', d.paymentMeansCode), isNote && opt('cbc:InstructionNote', d.reason)]),
     d.docDiscount &&
       el('cac:AllowanceCharge', [
