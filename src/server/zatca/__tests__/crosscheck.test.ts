@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 // Independent implementation (wes4m/zatca-xml-js, MIT, devDependency) used purely as a cross-check.
 import { XMLDocument } from 'zatca-xml-js/lib/parser';
 import { generateQR } from 'zatca-xml-js/lib/zatca/qr';
@@ -17,8 +17,13 @@ const keys = generateKeyPair();
 const cert = selfSignedCertificate(keys);
 
 // zatca-xml-js formats QR tag 3 with moment() in local time; pin the process to UTC so it is comparable.
+const originalTz = process.env.TZ;
 beforeAll(() => {
   process.env.TZ = 'UTC';
+});
+afterAll(() => {
+  if (originalTz === undefined) delete process.env.TZ;
+  else process.env.TZ = originalTz;
 });
 
 describe.each([
