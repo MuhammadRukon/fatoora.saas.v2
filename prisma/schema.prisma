@@ -24,6 +24,7 @@ model User {
   sessions       Session[]
   subscriptions  Subscription[]       @relation("SubscriptionUser")
   activations    Subscription[]       @relation("SubscriptionActivatedBy")
+  businesses     Business[]
 
   @@index([role])
 }
@@ -111,6 +112,131 @@ model Subscription {
   activatedBy   User?              @relation("SubscriptionActivatedBy", fields: [activatedById], references: [id])
 
   @@index([userId, status])
+}
+
+enum ZatcaEnvironment {
+  SIMULATION
+  PRODUCTION
+}
+
+/// ZATCA seller identification scheme (BT-29-1). "700" is not a valid Prisma identifier, hence S700.
+enum SellerIdScheme {
+  CRN
+  MOM
+  MLS
+  S700 @map("700")
+  SAG
+  OTH
+}
+
+/// ZATCA buyer identification scheme (BT-46-1).
+enum BuyerIdScheme {
+  TIN
+  CRN
+  MOM
+  MLS
+  S700 @map("700")
+  SAG
+  NAT
+  GCC
+  IQA
+  PAS
+  OTH
+}
+
+enum EgsStatus {
+  NEW
+  COMPLIANCE_ISSUED
+  ACTIVE
+  FAILED
+  REVOKED
+}
+
+/// The seller. 1:1 with its owner in v1, enforced in business.service (not here),
+/// so multi-business later needs only a selector and a membership table.
+model Business {
+  id               String           @id @default(cuid())
+  ownerId          String
+  nameEn           String
+  nameAr           String
+  vatNumber        String           @db.Char(15)
+  sellerIdScheme   SellerIdScheme
+  sellerIdValue    String
+  street           String
+  streetAr         String?
+  buildingNumber   String           @db.Char(4)
+  additionalNumber String?
+  district         String
+  districtAr       String?
+  city             String
+  cityAr           String?
+  postalCode       String           @db.Char(5)
+  countryCode      String           @default("SA") @db.Char(2)
+  businessCategory String
+  zatcaEnvironment ZatcaEnvironment @default(SIMULATION)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  owner            User             @relation(fields: [ownerId], references: [id])
+  egsUnits         EgsUnit[]
+  customers        Customer[]
+
+  @@index([ownerId])
+}
+
+/// ZATCA e-invoice generation solution unit. At most one non-REVOKED unit per
+/// (businessId, environment): partial unique index "EgsUnit_one_live_per_business_env"
+/// in the migration SQL. Onboarding (keys, CSIDs) lands in Phase 6.
+model EgsUnit {
+  id                  String           @id @default(cuid())
+  businessId          String
+  environment         ZatcaEnvironment
+  /// Format `1-Fatoora|2-v2|3-<uuid>`.
+  serialNumber        String           @unique
+  commonName          String
+  functionalityMap    String           @default("1100")
+  status              EgsStatus        @default(NEW)
+  privateKeyEnc       String?
+  csrPem              String?
+  complianceRequestId String?
+  complianceCsidEnc   String?
+  complianceSecretEnc String?
+  productionCsidEnc   String?
+  productionSecretEnc String?
+  certificatePem      String?
+  certNotAfter        DateTime?
+  lastIcv             Int              @default(0)
+  /// Starts at the ZATCA PIH seed: base64(sha256 hex of "0").
+  lastInvoiceHash     String           @default("NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==")
+  lastError           String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  business            Business         @relation(fields: [businessId], references: [id])
+
+  @@index([businessId])
+}
+
+model Customer {
+  id               String         @id @default(cuid())
+  businessId       String
+  name             String
+  nameAr           String?
+  vatNumber        String?
+  buyerIdScheme    BuyerIdScheme?
+  buyerIdValue     String?
+  street           String?
+  buildingNumber   String?
+  additionalNumber String?
+  district         String?
+  city             String?
+  postalCode       String?
+  countryCode      String         @default("SA") @db.Char(2)
+  email            String?
+  phone            String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  business         Business       @relation(fields: [businessId], references: [id])
+
+  @@index([businessId])
 }
 
 /// Postgres-backed rate-limit bucket. Replaces the old in-process Map
