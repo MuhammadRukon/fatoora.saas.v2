@@ -4,12 +4,14 @@
 
 - `src/app/(public)`: landing page (`/`, links to Login and Sign up) and the auth pages `/login`, `/signup`, `/verify-email`, `/forgot-password`, `/reset-password` (client components with server actions). The layout is a plain centered `<main>`.
 - `src/app/(dashboard)`: admin, wrapped by a sidebar layout that server-checks `role === 'ADMIN'`.
+- `src/app/(app)`: the user area. Its layout server-checks `role === 'USER'` (admins go to `/dashboard`). `/plans` (four plan cards, request via `useRequestPlan`; pending/active banners) is open to any USER; `app/layout.tsx` redirects every `/app/**` page to `/plans` unless the subscription state is ACTIVE.
+- `/` redirects a signed-in user by role (ADMIN → `/dashboard`, USER → `/app`), which is also the post-login landing.
 - Shared error surfaces: `error.tsx`, `global-error.tsx`, `not-found.tsx`. No `loading.tsx` yet.
 
 ## Admin pages (`/dashboard/*`)
 
-- `/dashboard`: overview placeholder (user and subscription counts land in plan Phase 2).
-- `/dashboard/users`: user table with create/edit dialog (`src/modules/admin/users/hooks.ts`), via the shared `src/components/data-table.tsx` (client-side pagination/filtering).
+- `/dashboard`: counts of USER accounts, PENDING requests and users with an ACTIVE subscription.
+- `/dashboard/users`: user table with subscription state, latest plan, requested-at and active-until columns, and an Activate button (confirm dialog) on rows with a pending request (`src/modules/admin/users/hooks.ts`), via the shared `src/components/data-table.tsx` (client-side pagination). Avatars are initials only.
 
 Sidebar: `src/components/dashboard-sidebar.tsx` (`navMain` = Dashboard, Users).
 
@@ -18,7 +20,8 @@ Sidebar: `src/components/dashboard-sidebar.tsx` (`navMain` = Dashboard, Users).
 Each domain has `hooks.ts` (React Query wrappers over `src/lib/fetcher.ts`) and `components/`:
 
 - `auth/`: server actions (`actions.ts`: signup, verify, resend, forgot, reset, change-password, logout), auth-card, google-button.
-- `admin/users/`: `useAdminUsers`, `useAdminUserMutations`.
+- `admin/users/`: `useAdminUsers`, `useActivateSubscription`.
+- `subscriptions/`: `useSubscriptionState`, `useRequestPlan`.
 
 ## State management
 

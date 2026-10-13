@@ -21,9 +21,9 @@ UI (src/app pages, src/modules components/hooks)
 - **JWT session strategy.** `id` and `role` are baked into the token at sign-in and exposed via the `session` callback. Role changes only take effect when the token refreshes.
 - Providers: credentials (bcrypt cost 10, `src/server/auth/password.ts`) + Google (registered only when env vars are present).
 - Signup (`src/server/auth/auth.service.ts`) creates `role: USER`. Admins are created by the seed.
-- **Edge guard**: `src/proxy.ts` (Next 16's middleware file) verifies the JWT and requires `role === 'ADMIN'` for `/dashboard/:path*` and `/api/admin/:path*` (pages redirect to `/login`, API calls get 401). Fast-fail only; real enforcement:
-  - Every `/api/admin/**` route calls `requireAdminSession()`.
-  - `(dashboard)/layout.tsx` re-checks `session.user.role === 'ADMIN'` server-side and redirects.
+- **Edge guard**: `src/proxy.ts` (Next 16's middleware file) verifies the JWT and requires `role === 'ADMIN'` for `/dashboard/:path*` and `/api/admin/:path*`, and any valid token for `/app/:path*`, `/plans`, `/api/app/:path*` and `/api/subscriptions/:path*` (an ADMIN visiting `/app` or `/plans` is redirected to `/dashboard`). Pages redirect to `/login`, API calls get 401. Fast-fail only; real enforcement:
+  - Every `/api/admin/**` route calls `requireAdminSession()`; every `/api/app/**` route calls `requireAppSession()` (USER + ACTIVE subscription, else 402).
+  - `(dashboard)/layout.tsx` re-checks `session.user.role === 'ADMIN'`, `(app)/layout.tsx` re-checks `role === 'USER'`, and `(app)/app/layout.tsx` requires an ACTIVE subscription.
 - Password reset: tokens stored SHA-256-hashed (`src/server/auth/tokens.ts`), single-use, TTL-checked, emailed through the mailer. Outside production the response also carries `devResetUrl`.
 - Email verification: signup issues a 6-digit code plus a link token (`src/server/auth/verification.ts`, hashed rows in `VerificationToken`, 30 min TTL); credentials login is refused until `User.emailVerified` is set. Without `RESEND_API_KEY` the signup action returns the code as `devCode`.
 

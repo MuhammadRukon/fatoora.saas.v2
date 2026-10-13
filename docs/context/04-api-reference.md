@@ -1,6 +1,6 @@
 # API Reference
 
-All routes live under `src/app/api/**`. Auth levels: **public**, **user** (`requireSession`), **admin** (`requireAdminSession`). Bodies are validated with Zod contracts from `src/contracts/**`. Rate-limited routes return 429 + `Retry-After`.
+All routes live under `src/app/api/**`. Auth levels: **public**, **user** (`requireUserSession`: role USER, 403 for an admin), **app** (`requireAppSession`: USER with an ACTIVE subscription, else 402 `SUBSCRIPTION_REQUIRED`), **admin** (`requireAdminSession`). Bodies are validated with Zod contracts from `src/contracts/**`. Rate-limited routes return 429 + `Retry-After`.
 
 ## Auth
 
@@ -13,12 +13,20 @@ All routes live under `src/app/api/**`. Auth levels: **public**, **user** (`requ
 
 Signup, email verification (verify code, resend), forgot/reset and change-password also run as server actions in `src/modules/auth/actions.ts`; all are rate-limited.
 
+## Subscriptions
+
+| Route | Methods | Auth | Notes |
+| --- | --- | --- | --- |
+| `/api/subscriptions` | POST | user | `{plan}` → 201 PENDING subscription; 409 `SUBSCRIPTION_PENDING` while one is open; 422 on an unknown plan |
+| `/api/subscriptions/me` | GET | user | `{state: NONE\|PENDING\|ACTIVE\|EXPIRED, activeUntil, pending}` |
+| `/api/app/ping` | GET | app | gate fixture: `{ok:true}`; every future `/api/app/**` route uses `requireAppSession()` |
+
 ## Admin
 
 | Route | Methods | Auth | Notes |
 | --- | --- | --- | --- |
-| `/api/admin/users` | GET/POST | admin | list users (newest first) / create a user with a role |
-| `/api/admin/users/[id]` | PUT | admin | edit name, phone, image, role; no delete |
+| `/api/admin/users` | GET | admin | list users (newest first) with `subscriptions` (latest 5) and computed `subscriptionState`; no create/edit (admins are seed-created) |
+| `/api/admin/subscriptions/[id]/activate` | POST | admin | activate a PENDING request under a row lock → 200; 409 `SUBSCRIPTION_NOT_PENDING`; 404 unknown id |
 
 A non-admin token gets 401 from the edge guard (`src/proxy.ts`) before the route runs; the route itself answers 401 (no session) or 403 (not admin).
 
