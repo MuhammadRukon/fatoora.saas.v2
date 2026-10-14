@@ -12,6 +12,7 @@ import {
   extractQrFromXml,
   redactHeaders,
   signInvoice,
+  riyadhDisplay,
   toZatcaDateTime,
   buildUnsignedInvoiceXml,
   type ZatcaAuth,
@@ -62,7 +63,6 @@ export function missingBuyerFields(buyer: PartySnapshot | null): string[] {
  * Returns the document id; nothing here touches the network (the signed XML is stored before any submission).
  */
 async function issue(businessId: string, documentId: string, opts: IssuanceOptions = {}): Promise<string> {
-  const now = opts.now ?? new Date();
   const key = opts.encryptionKey ?? env.ZATCA_ENCRYPTION_KEY;
 
   return prisma.$transaction(
@@ -81,6 +81,12 @@ async function issue(businessId: string, documentId: string, opts: IssuanceOptio
       if (!locked.length) throw notOnboarded();
       const egs = await tx.egsUnit.findUniqueOrThrow({ where: { id: locked[0].id } });
       if (!egs.privateKeyEnc || !egs.certificatePem) throw notOnboarded();
+
+      // Taken after the lock: queued issues must not stamp a time earlier than the chain predecessor's.
+      const now = opts.now ?? new Date();
+      if (egs.certNotAfter && egs.certNotAfter < now) {
+        throw new ConflictError('The EGS certificate has expired; onboard again (ZATCA_CERT_EXPIRED)', { code: 'ZATCA_CERT_EXPIRED' });
+      }
 
       // 2. Lock the document.
       const own = await tx.$queryRaw<{ id: string }[]>`
@@ -118,7 +124,7 @@ async function issue(businessId: string, documentId: string, opts: IssuanceOptio
         }
         billingReferenceNumber = original.number;
       }
-      if (doc.supplyDate && dayString(doc.supplyDate)! > issueDate) {
+      if (doc.supplyDate && dayString(doc.supplyDate)! > riyadhDisplay(now).slice(0, 10)) {
         throw new ValidationError('The supply date cannot be after the issue date (SUPPLY_DATE_IN_FUTURE)', { code: 'SUPPLY_DATE_IN_FUTURE' });
       }
 

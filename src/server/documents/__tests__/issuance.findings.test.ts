@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { testUsers } from '@/server/business/__tests__/fixtures';
 
 import { issuanceService } from '../issuance.service';
-import { completeCustomer, createDraft, deps, mockGateway, NOW, setupIssuing } from './issuance-fixtures';
+import { completeCustomer, createDraft, deps, KEY, mockGateway, NOW, setupIssuing } from './issuance-fixtures';
 
 const users = testUsers('issue-find');
 afterEach(() => users.cleanup());
@@ -79,5 +79,50 @@ describe('duplicate responses (finding 4a)', () => {
     const r = await row(d.id);
     expect(r).toMatchObject({ submissionStatus: 'PENDING_RETRY', clearedXml: null });
     expect(JSON.stringify(r.zatcaResponse)).toContain('already cleared');
+  });
+});
+
+describe('issue-time rules (findings 7, 10, 11)', () => {
+  const failure = (p: Promise<unknown>) => p.then(() => null, (e: Error & { meta?: Record<string, unknown> }) => e);
+
+  it('7: the supply date is compared with the Riyadh calendar date (21:30Z is already tomorrow there)', async () => {
+    const { business } = await setupIssuing(users);
+    const customer = await completeCustomer(business.id);
+    const late = new Date('2026-10-14T21:30:00Z');
+    const ok = await createDraft(business.id, { subtype: 'STANDARD', customerId: customer.id, supplyDate: '2026-10-15' });
+    await issuanceService.issue(business.id, ok.id, deps(mockGateway().fetchImpl, late));
+    expect((await row(ok.id)).status).toBe('ISSUED');
+
+    const future = await createDraft(business.id, { subtype: 'STANDARD', customerId: customer.id, supplyDate: '2026-10-16' });
+    const err = await failure(issuanceService.issue(business.id, future.id, deps(mockGateway().fetchImpl, late)));
+    expect(err?.meta?.code).toBe('SUPPLY_DATE_IN_FUTURE');
+  });
+
+  it('10: an expired certificate is a 409 before anything is allocated', async () => {
+    const { business, egs } = await setupIssuing(users);
+    await prisma.egsUnit.update({ where: { id: egs!.id }, data: { certNotAfter: new Date(NOW.getTime() - 86_400_000) } });
+    const d = await createDraft(business.id);
+    const err = await failure(issuanceService.issue(business.id, d.id, deps(mockGateway().fetchImpl)));
+    expect(err).toMatchObject({ code: 'CONFLICT', meta: { code: 'ZATCA_CERT_EXPIRED' } });
+    expect(await row(d.id)).toMatchObject({ status: 'DRAFT', sequence: null, icv: null });
+    expect((await egsOf(business.id)).lastIcv).toBe(0);
+  });
+
+  it('11: the issue time is taken after the EGS lock is acquired', async () => {
+    const { business, egs } = await setupIssuing(users);
+    const d = await createDraft(business.id);
+    let release = new Date(0);
+    let locked!: () => void;
+    const held = new Promise<void>((r) => (locked = r));
+    const holder = prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "EgsUnit" WHERE "id" = ${egs!.id} FOR UPDATE`;
+      locked();
+      await new Promise((r) => setTimeout(r, 500));
+      release = new Date();
+    });
+    await held;
+    await issuanceService.issue(business.id, d.id, { fetchImpl: mockGateway().fetchImpl, encryptionKey: KEY });
+    await holder;
+    expect((await row(d.id)).issuedAt!.getTime()).toBeGreaterThanOrEqual(release.getTime());
   });
 });
