@@ -21,6 +21,7 @@ Each domain has `hooks.ts` (React Query wrappers over `src/lib/fetcher.ts`) and 
 
 - `auth/`: server actions (`actions.ts`: signup, verify, resend, forgot, reset, change-password, logout), auth-card, google-button.
 - `admin/users/`: `useAdminUsers`, `useActivateSubscription`.
+- `business/`: `useBusiness`, `useSaveBusiness`; `customers/`: `useCustomers`, `useCustomer`, `useSaveCustomer`, `useDeleteCustomer`. `/app/*` uses `AppSidebar`; pages outside `/app/business` sit in `(with-business)/` and redirect to `/app/business?setup=1` without a business.
 - `subscriptions/`: `useSubscriptionState`, `useRequestPlan`.
 
 ## State management
