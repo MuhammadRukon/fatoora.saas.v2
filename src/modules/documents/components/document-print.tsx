@@ -124,6 +124,7 @@ export function DocumentPrint({ doc, backHref }: { doc: DocumentDTO; backHref: s
       <article
         dir="rtl"
         lang="ar"
+        translate="no"
         className="print-root relative mx-auto my-6 flex min-h-[297mm] w-[210mm] max-w-full flex-col gap-4 overflow-hidden bg-white p-[10mm] text-sm text-black shadow-lg"
         style={{ fontFamily: "'Segoe UI', Tahoma, 'Noto Naskh Arabic', Arial, sans-serif" }}
       >
