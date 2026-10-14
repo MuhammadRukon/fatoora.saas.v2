@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { ColumnDef } from '@tanstack/react-table';
 import { IconAlertCircle, IconPlus, IconSearch, IconUsers } from '@tabler/icons-react';
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BUYER_ID_SCHEME_LABELS, type CustomerDTO } from '@/contracts/customers';
+import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { useCustomers } from '@/modules/customers/hooks';
 
 const columns: ColumnDef<CustomerDTO, unknown>[] = [
@@ -76,11 +77,7 @@ const columns: ColumnDef<CustomerDTO, unknown>[] = [
 
 export function CustomerList() {
   const [search, setSearch] = useState('');
-  const [q, setQ] = useState('');
-  useEffect(() => {
-    const t = setTimeout(() => setQ(search.trim()), 250);
-    return () => clearTimeout(t);
-  }, [search]);
+  const q = useDebouncedValue(search.trim());
 
   const { data, isLoading, isError, hasNextPage, fetchNextPage, isFetchingNextPage } = useCustomers(q);
   const customers = useMemo(() => data?.pages.flatMap((p) => p.items) ?? [], [data]);

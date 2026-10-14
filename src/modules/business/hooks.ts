@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { apiFetch, ApiClientError } from '@/lib/fetcher';
+import { apiFetch, errorToast } from '@/lib/fetcher';
 import { queryKeys } from '@/constants/queryKeys';
 import type { BusinessDTO, BusinessUpsertData } from '@/contracts/business';
 
@@ -22,7 +22,6 @@ export function useSaveBusiness() {
       qc.setQueryData(queryKeys.business, business);
       toast.success('Business profile saved');
     },
-    onError: (err) =>
-      toast.error(err instanceof ApiClientError ? err.message : 'Could not save the business profile'),
+    onError: errorToast('Could not save the business profile'),
   });
 }

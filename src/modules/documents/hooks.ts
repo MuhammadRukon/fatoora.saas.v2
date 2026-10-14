@@ -1,19 +1,12 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { apiFetch, ApiClientError } from '@/lib/fetcher';
+import { apiFetch, ApiClientError, errorToast } from '@/lib/fetcher';
 import { queryKeys } from '@/constants/queryKeys';
 import type { DocumentDraftData, DocumentDTO, DocumentListItemDTO, DocumentListQuery } from '@/contracts/documents';
-
-interface DocumentPage {
-  items: DocumentListItemDTO[];
-  nextCursor: string | null;
-}
+import type { CursorPage } from '@/server/common/pagination';
 
 type DocumentFilters = Pick<DocumentListQuery, 'kind' | 'status' | 'submissionStatus' | 'q'>;
-
-const errorToast = (fallback: string) => (err: unknown) =>
-  toast.error(err instanceof ApiClientError ? err.message : fallback);
 
 export function useDocuments(filters: DocumentFilters) {
   return useInfiniteQuery({
@@ -23,7 +16,7 @@ export function useDocuments(filters: DocumentFilters) {
       const params = new URLSearchParams({ limit: '50' });
       for (const [k, v] of Object.entries(filters)) if (v) params.set(k, v);
       if (pageParam) params.set('cursor', pageParam);
-      return apiFetch<DocumentPage>(`/api/app/documents?${params}`);
+      return apiFetch<CursorPage<DocumentListItemDTO>>(`/api/app/documents?${params}`);
     },
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });

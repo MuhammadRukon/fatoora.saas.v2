@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { apiFetch, ApiClientError } from '@/lib/fetcher';
+import { apiFetch, errorToast } from '@/lib/fetcher';
 import { queryKeys } from '@/constants/queryKeys';
 import type {
   SubscriptionCreateInput,
@@ -22,8 +22,7 @@ export function useRequestPlan() {
     mutationFn: (input: SubscriptionCreateInput) =>
       apiFetch<SubscriptionDTO>('/api/subscriptions', { method: 'POST', body: input }),
     onSuccess: () => toast.success('Plan requested. An admin will activate it shortly.'),
-    onError: (err) =>
-      toast.error(err instanceof ApiClientError ? err.message : 'Could not request plan'),
+    onError: errorToast('Could not request plan'),
     onSettled: () => qc.invalidateQueries({ queryKey: queryKeys.subscriptionState }),
   });
 }

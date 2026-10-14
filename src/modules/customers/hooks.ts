@@ -1,17 +1,11 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { apiFetch, ApiClientError } from '@/lib/fetcher';
+import { apiFetch, ApiClientError, errorToast } from '@/lib/fetcher';
 import { queryKeys } from '@/constants/queryKeys';
 import type { CustomerData, CustomerDTO } from '@/contracts/customers';
+import type { CursorPage } from '@/server/common/pagination';
 
-interface CustomerPage {
-  items: CustomerDTO[];
-  nextCursor: string | null;
-}
-
-const errorToast = (fallback: string) => (err: unknown) =>
-  toast.error(err instanceof ApiClientError ? err.message : fallback);
 
 export function useCustomers(q: string) {
   return useInfiniteQuery({
@@ -21,7 +15,7 @@ export function useCustomers(q: string) {
       const params = new URLSearchParams({ limit: '50' });
       if (q) params.set('q', q);
       if (pageParam) params.set('cursor', pageParam);
-      return apiFetch<CustomerPage>(`/api/app/customers?${params}`);
+      return apiFetch<CursorPage<CustomerDTO>>(`/api/app/customers?${params}`);
     },
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
