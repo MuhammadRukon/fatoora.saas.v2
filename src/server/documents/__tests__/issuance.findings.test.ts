@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { testUsers } from '@/server/business/__tests__/fixtures';
 
 import { issuanceService } from '../issuance.service';
-import { createDraft, deps, mockGateway, NOW, setupIssuing } from './issuance-fixtures';
+import { completeCustomer, createDraft, deps, mockGateway, NOW, setupIssuing } from './issuance-fixtures';
 
 const users = testUsers('issue-find');
 afterEach(() => users.cleanup());
@@ -58,5 +58,26 @@ describe('retryPending fairness (finding 3)', () => {
     }
     expect(await row(healthy.id)).toMatchObject({ submissionStatus: 'REPORTED' });
     expect(rounds).toBeLessThan(6);
+  });
+});
+
+describe('duplicate responses (finding 4a)', () => {
+  it('a simplified duplicate is REPORTED with a warning and a portal note', async () => {
+    const { business } = await setupIssuing(users);
+    const d = await createDraft(business.id);
+    await issuanceService.issueAndSubmit(business.id, d.id, deps(mockGateway({ report: { status: 409, body: {} } }).fetchImpl));
+    const r = await row(d.id);
+    expect(r).toMatchObject({ submissionStatus: 'REPORTED', hasWarnings: true, submissionAttempts: 1 });
+    expect(JSON.stringify(r.zatcaResponse)).toContain('already received');
+  });
+
+  it('a standard duplicate stays PENDING_RETRY with a note (the cleared XML cannot be re-fetched)', async () => {
+    const { business } = await setupIssuing(users);
+    const customer = await completeCustomer(business.id);
+    const d = await createDraft(business.id, { subtype: 'STANDARD', customerId: customer.id, supplyDate: '2026-10-01' });
+    await issuanceService.issueAndSubmit(business.id, d.id, deps(mockGateway({ clear: { status: 409, body: {} } }).fetchImpl));
+    const r = await row(d.id);
+    expect(r).toMatchObject({ submissionStatus: 'PENDING_RETRY', clearedXml: null });
+    expect(JSON.stringify(r.zatcaResponse)).toContain('already cleared');
   });
 });

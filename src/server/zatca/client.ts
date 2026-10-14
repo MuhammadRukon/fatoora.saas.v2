@@ -6,6 +6,7 @@ export type ZatcaOutcome =
   | 'PASS'
   | 'WARNING'
   | 'REJECTED'
+  | 'DUPLICATE'
   | 'CLEARANCE_DISABLED'
   | 'AUTH_ERROR'
   | 'SERVER_ERROR'
@@ -27,11 +28,21 @@ const SENSITIVE = new Set(['authorization', 'otp']);
 export const redactHeaders = (h: Record<string, string>) =>
   Object.fromEntries(Object.entries(h).map(([k, v]) => [k, SENSITIVE.has(k.toLowerCase()) ? '[REDACTED]' : v]));
 
-function outcomeFor(status: number): ZatcaOutcome {
+// ASSUMPTION (unverified until the Simulation gate, AC6.4): a resubmission of an already-received document answers 409,
+// or 400 with "duplicate"/"already" in its error code or message.
+const DUPLICATE_RE = /duplicate|already/i;
+function looksDuplicate(body: unknown): boolean {
+  const b = asRecord(body);
+  const codes = [b.code, b.errorCode].filter((v): v is string => typeof v === 'string');
+  return [...codes, ...summarizeValidation(body).errorMessages].some((t) => DUPLICATE_RE.test(t));
+}
+
+function outcomeFor(status: number, body: unknown): ZatcaOutcome {
   if (status === 200) return 'PASS';
   if (status === 202) return 'WARNING';
   if (status === 303) return 'CLEARANCE_DISABLED';
-  if (status === 400) return 'REJECTED';
+  if (status === 409) return 'DUPLICATE';
+  if (status === 400) return looksDuplicate(body) ? 'DUPLICATE' : 'REJECTED';
   if (status === 401 || status === 403) return 'AUTH_ERROR';
   // Anything else (413, 404, 5xx) is not a verdict on the document.
   return 'SERVER_ERROR';
@@ -61,7 +72,7 @@ export function createZatcaClient(env: ZatcaEnvironment, fetchImpl: typeof fetch
       } catch {
         parsed = { raw: text };
       }
-      res = { httpStatus: r.status, body: parsed, outcome: outcomeFor(r.status) };
+      res = { httpStatus: r.status, body: parsed, outcome: outcomeFor(r.status, parsed) };
     } catch (e) {
       res = { httpStatus: 0, body: { error: e instanceof Error ? e.message : String(e) }, outcome: 'NETWORK_ERROR' };
     } finally {

@@ -269,6 +269,21 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
         const qr = extractQrFromXml(clearedXml);
         if (qr) data.qrBase64 = qr;
       }
+    } else if (res.outcome === 'DUPLICATE') {
+      // ASSUMPTION (see client.ts): ZATCA already has this document. A reported one is done; a cleared one lost its
+      // response, and the cleared XML cannot be re-fetched, so it stays pending with a note. Confirm at the Simulation gate.
+      data.zatcaResponse = {
+        httpStatus: res.httpStatus,
+        outcome: res.outcome,
+        ...storedBody,
+        submissionNote: cleared
+          ? 'ZATCA reports this document already cleared; clearance XML unavailable, check the Fatoora portal'
+          : 'ZATCA reports this document already received; confirm in the Fatoora portal',
+      } as Prisma.InputJsonValue;
+      if (!cleared) {
+        data.submissionStatus = 'REPORTED';
+        data.hasWarnings = true;
+      }
     } else if (res.outcome === 'REJECTED') {
       data.submissionStatus = 'REJECTED';
     } else if (res.outcome === 'AUTH_ERROR') {
@@ -277,7 +292,18 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
         data: { lastError: `${AUTH_ERROR_PREFIX} (HTTP ${res.httpStatus}); re-onboard required` },
       });
     }
-    await prisma.document.update({ where: { id: documentId }, data });
+    try {
+      await prisma.document.update({ where: { id: documentId }, data });
+    } catch (err) {
+      // ZATCA has answered but the outcome was not saved: retry once; a resubmission would later answer DUPLICATE.
+      log.error('zatca.outcome_write_failed', { documentId, error: err instanceof Error ? err.message : String(err) });
+      try {
+        await prisma.document.update({ where: { id: documentId }, data });
+      } catch (err2) {
+        log.error('zatca.outcome_lost', { documentId, httpStatus: res.httpStatus, outcome: res.outcome, error: err2 instanceof Error ? err2.message : String(err2) });
+        throw err2;
+      }
+    }
     if (res.outcome === 'PASS' || res.outcome === 'WARNING' || res.outcome === 'REJECTED') {
       // The credentials worked, so a stale auth failure no longer applies.
       await prisma.egsUnit.updateMany({ where: { id: egs.id, lastError: { startsWith: AUTH_ERROR_PREFIX } }, data: { lastError: null } });

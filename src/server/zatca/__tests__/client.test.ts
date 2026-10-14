@@ -24,6 +24,14 @@ describe('zatca client outcomes (AC6.2)', () => {
     expect(res).toEqual({ httpStatus: status, body, outcome });
   });
 
+  it('maps 409 and duplicate-looking 400 bodies to DUPLICATE (assumed shape, confirm in the Simulation gate)', async () => {
+    const post = (status: number, body: unknown) => createZatcaClient('SIMULATION', reply(status, body)).report(auth, payload);
+    expect((await post(409, {})).outcome).toBe('DUPLICATE');
+    expect((await post(400, { errors: [{ code: 'X', message: 'Invoice already reported' }] })).outcome).toBe('DUPLICATE');
+    expect((await post(400, { message: 'Duplicate invoice' })).outcome).toBe('DUPLICATE');
+    expect((await post(400, { validationResults: { errorMessages: [{ code: 'E', message: 'bad vat' }] } })).outcome).toBe('REJECTED');
+  });
+
   it('maps a thrown fetch and an abort to NETWORK_ERROR', async () => {
     const boom = vi.fn(async () => {
       throw new TypeError('fetch failed');
