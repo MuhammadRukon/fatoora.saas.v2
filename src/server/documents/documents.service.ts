@@ -11,6 +11,8 @@ import { prisma } from '@/lib/prisma';
 import { ConflictError, NotFoundError, ValidationError } from '@/server/common/errors';
 import { clampLimit, type CursorPage } from '@/server/common/pagination';
 
+import { summarizeValidation } from '@/server/zatca';
+
 import { buyerParty, sellerParty } from './parties';
 import { computeDocument, STANDARD_RATE_BP } from './vat-engine';
 
@@ -19,6 +21,7 @@ type DocumentRow = Document & {
   business: Business;
   customer: Customer | null;
   billingReference: { id: string; number: string | null } | null;
+  egsUnit: { lastError: string | null } | null;
 };
 
 const include = {
@@ -26,6 +29,7 @@ const include = {
   business: true,
   customer: true,
   billingReference: { select: { id: true, number: true } },
+  egsUnit: { select: { lastError: true } },
 } satisfies Prisma.DocumentInclude;
 
 const dayString = (d: Date | null) => d?.toISOString().slice(0, 10) ?? null;
@@ -46,6 +50,7 @@ function toDTO(d: DocumentRow): DocumentDTO {
     })),
     docDiscountHalalas: d.docDiscountHalalas,
   });
+  const verdict = summarizeValidation(d.zatcaResponse);
   return {
     id: d.id,
     kind: d.kind,
@@ -77,6 +82,14 @@ function toDTO(d: DocumentRow): DocumentDTO {
     submissionStatus: d.submissionStatus,
     isTest: d.isTest,
     qrBase64: d.qrBase64,
+    uuid: d.uuid,
+    icv: d.icv,
+    hasWarnings: d.hasWarnings,
+    submissionAttempts: d.submissionAttempts,
+    lastAttemptAt: iso(d.lastAttemptAt),
+    submissionErrors: verdict.errorMessages,
+    submissionWarnings: verdict.warningMessages,
+    reonboardRequired: d.submissionStatus === 'PENDING_RETRY' && !!d.egsUnit?.lastError?.includes('re-onboard required'),
     createdAt: d.createdAt.toISOString(),
     updatedAt: d.updatedAt.toISOString(),
     lines: d.lines.map((l) => ({
@@ -221,6 +234,20 @@ export const documentsService = {
     const row = await prisma.document.findFirst({ where: { id, businessId }, include });
     if (!row) throw new NotFoundError('Document');
     return toDTO(row);
+  },
+
+  /** The legal XML of an ISSUED document: ZATCA's cleared copy when there is one, else our signed copy. */
+  async getXml(businessId: string, id: string) {
+    const d = await prisma.document.findFirst({
+      where: { id, businessId },
+      select: { status: true, number: true, signedXml: true, clearedXml: true },
+    });
+    if (!d) throw new NotFoundError('Document');
+    const xml = d.clearedXml ?? d.signedXml;
+    if (d.status !== 'ISSUED' || !xml || !d.number) {
+      throw new ConflictError('Only issued documents have an XML (NOT_ISSUED)', { code: 'NOT_ISSUED' });
+    }
+    return { number: d.number, xml };
   },
 
   async list(

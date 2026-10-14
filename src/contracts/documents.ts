@@ -198,6 +198,16 @@ export interface DocumentDTO {
   submissionStatus: SubmissionStatus;
   isTest: boolean;
   qrBase64: string | null;
+  uuid: string | null;
+  icv: number | null;
+  hasWarnings: boolean;
+  submissionAttempts: number;
+  lastAttemptAt: string | null;
+  /** ZATCA's error and warning texts from the last response (never raw bodies). */
+  submissionErrors: string[];
+  submissionWarnings: string[];
+  /** The EGS credentials were refused by ZATCA: the user must onboard again. */
+  reonboardRequired: boolean;
   createdAt: string;
   updatedAt: string;
   lines: DocumentLineDTO[];

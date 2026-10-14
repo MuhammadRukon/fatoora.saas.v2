@@ -12,7 +12,7 @@ export const KEY = Buffer.alloc(32, 7).toString('base64');
 export const NOW = new Date('2026-10-14T09:30:00Z');
 
 /** A business with an ACTIVE EGS holding a real (self-signed secp256k1) key and certificate. */
-export async function setupIssuing(users: ReturnType<typeof testUsers>, o: { egs?: boolean } = {}) {
+export async function setupIssuing(users: ReturnType<typeof testUsers>, o: { egs?: boolean; key?: string } = {}) {
   const user = await users.create();
   const business = await prisma.business.create({ data: { ...businessData(), ownerId: user.id } });
   let egs = null;
@@ -25,17 +25,17 @@ export async function setupIssuing(users: ReturnType<typeof testUsers>, o: { egs
         serialNumber: `1-Fatoora|2-v2|3-${Math.random()}`,
         commonName: 'Test-EGS',
         status: 'ACTIVE',
-        privateKeyEnc: encrypt(keys.privateKeyPem, KEY),
+        privateKeyEnc: encrypt(keys.privateKeyPem, o.key ?? KEY),
         certificatePem: selfSignedCertificate(keys).pem,
-        productionCsidEnc: encrypt('token', KEY),
-        productionSecretEnc: encrypt('secret', KEY),
+        productionCsidEnc: encrypt('token', o.key ?? KEY),
+        productionSecretEnc: encrypt('secret', o.key ?? KEY),
       },
     });
   }
   return { user, business, egs };
 }
 
-const line = { description: 'Widget', quantity: '3', unitPriceHalalas: 3333, taxCategory: 'S' };
+const line = { description: 'Widget', quantity: '3', unitPriceHalalas: 3333, taxCategory: 'S' as const };
 export const draftBody = (o: Partial<DocumentDraftInput> = {}): DocumentDraftInput => ({
   kind: 'INVOICE',
   subtype: 'SIMPLIFIED',
