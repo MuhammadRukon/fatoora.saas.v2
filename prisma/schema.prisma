@@ -336,6 +336,8 @@ model Document {
   zatcaResponse         Json?
   submissionAttempts    Int              @default(0)
   lastAttemptAt         DateTime?
+  /// Lease taken while a submission is in flight (cron and manual retry must not double-submit); cleared when done.
+  submittingSince       DateTime?
   /// True when issued on a SIMULATION EGS.
   isTest                Boolean          @default(false)
   createdAt             DateTime         @default(now())
@@ -345,7 +347,8 @@ model Document {
   /// NoAction (checked at statement end) so a note and its original can be removed in one deleteMany.
   billingReference      Document?        @relation("DocumentBillingReference", fields: [billingReferenceId], references: [id], onDelete: NoAction)
   referencedBy          Document[]       @relation("DocumentBillingReference")
-  egsUnit               EgsUnit?         @relation(fields: [egsUnitId], references: [id])
+  /// NoAction: an EGS unit that signed a document cannot be deleted (default SetNull would orphan the chain).
+  egsUnit               EgsUnit?         @relation(fields: [egsUnitId], references: [id], onDelete: NoAction)
   lines                 DocumentLine[]
 
   @@unique([businessId, kind, sequence])
