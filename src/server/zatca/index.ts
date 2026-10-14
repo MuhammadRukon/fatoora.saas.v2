@@ -10,3 +10,4 @@ export { buildCsr, generateKeyPair, type CsrInput, type ZatcaEnvironment } from 
 export { certificateFromToken, certificateInfo } from './certificate';
 export * from './crypto-box';
 export * from './client';
+export * from './compliance-docs';
