@@ -1,6 +1,8 @@
 import { SellerIdScheme, ZatcaEnvironment, type Business } from '@prisma/client';
 import { z } from 'zod';
 
+import { INVALID_CHARS_MESSAGE, noControlChars, singleLine } from './common';
+
 /** KSA VAT registration number (TRN): 15 digits, first and last are 3. */
 export const VAT_NUMBER_RE = /^3\d{13}3$/;
 export const VAT_NUMBER_MESSAGE = '15 digits, starting and ending with 3';
@@ -8,10 +10,14 @@ export const VAT_NUMBER_MESSAGE = '15 digits, starting and ending with 3';
 const ARABIC_MESSAGE = 'Must contain Arabic text';
 
 /** Required, trimmed text. */
-export const text = (max = 200) => z.string().trim().min(1, 'Required').max(max);
+export const text = (max = 200) => z.string().trim().min(1, 'Required').max(max).refine(singleLine, INVALID_CHARS_MESSAGE);
 
 /** Optional field: empty, null or missing is stored as null (null in: parsed form output round-trips). */
-export const nullable = (schema: z.ZodString) => schema.nullish().transform((v) => v || null);
+export const nullable = (schema: z.ZodString, multiline = false) =>
+  schema
+    .nullish()
+    .refine((v) => !v || (multiline ? noControlChars(v) : singleLine(v)), INVALID_CHARS_MESSAGE)
+    .transform((v) => v || null);
 
 /** Optional Arabic text: empty, or containing at least one Arabic-script character. */
 export const optionalArabic = nullable(

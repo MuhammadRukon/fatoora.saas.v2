@@ -85,7 +85,13 @@ export const QR_PLACEHOLDER = '<cbc:EmbeddedDocumentBinaryObject mimeCode="text/
 // ---- tiny deterministic XML writer: 4-space indentation, leaf text inline (same layout as the samples) ----
 type El = { name: string; attrs?: Record<string, string>; text?: string; children?: (El | null | undefined | false)[]; raw?: string };
 
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// Defensive twin of the contracts check (this module stays free of app imports): XML 1.0 forbids these characters.
+// eslint-disable-next-line no-control-regex
+const XML_ILLEGAL_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/;
+const esc = (s: string) => {
+  if (XML_ILLEGAL_RE.test(s)) throw new Error('Text contains a control character that is not allowed in an invoice');
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+};
 const escAttr = (s: string) => esc(s).replace(/"/g, '&quot;');
 
 function render(e: El, depth: number): string {
