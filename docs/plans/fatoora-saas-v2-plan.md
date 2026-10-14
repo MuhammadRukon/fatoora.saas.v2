@@ -788,6 +788,14 @@ Plus the test harness.
 
 The executor verifies this mapping against the Data Dictionary xlsx in Phase 5 step 1. `EDU` and `HEA` additionally require buyer scheme NAT, which is enforced at issue.
 
+## Open decision — admin visibility of business data (noted 2026-10-14)
+
+Current behavior (as planned): users see only their own business's customers/invoices (scoped by `businessId`, other business → 404). Admins see ONLY the users list + subscription status/activation. `/api/app/*` requires role `USER`; an ADMIN opening `/app` is redirected to `/dashboard`. Roles are only `ADMIN` and `USER` (no separate super admin; admins are seed-created).
+
+Why: issued documents are the businesses' own legal ZATCA records; platform-owner read access is a privacy decision, so it was left out until requested.
+
+Status 2026-10-14: user chose to DEFER this ('keep it in the note, don't code'). Nothing implemented. Decision pending (owner: user): keep admin = users + subscriptions only, OR add read-only admin pages for business profiles, customers and invoices (with ZATCA status), never exposing encrypted keys/CSID secrets, no edit/issue on behalf of a business. If chosen: small add-on after Phase 7 (admin read routes under `/api/admin/**` with `requireAdminSession()`, pages under `/dashboard`); data is already scoped by `businessId`, so no schema change. If a super-admin tier is wanted, add a `SUPER_ADMIN` enum value (touches role checks in `http.ts`, `proxy.ts`, dashboard layout).
+
 ## Execution Progress
 
 **Status: in progress**
@@ -798,12 +806,93 @@ Final commit list: —
 
 | Phase | Status | Commit | Review | Notes |
 | --- | --- | --- | --- | --- |
-| 0. Bootstrap | in-progress | — | deferred | agent: general-purpose (file ops + git + DB setup). Force push run by user. |
-| 1. Strip + rebrand | pending | — | deferred | — |
-| 2. Subscriptions | pending | — | deferred | — |
-| 3. Business + customers | pending | — | deferred | — |
-| 4. Documents core | pending | — | deferred | — |
-| 5. ZATCA crypto lib | pending | — | deferred | — |
-| 6. Onboarding + client | pending | — | deferred | — |
-| 7. Issuance pipeline | pending | — | deferred | — |
-| Cross-Validation | pending | — | — | — |
+| 0. Bootstrap | done | `2c65bf0` | deferred | agent: general-purpose. AC0.2/0.3/0.5 pass; AC0.4 see deviations; AC0.1 = user's force push (pending). npm audit: 37 vulns inherited from gadget. |
+| 1. Strip + rebrand | done | `277afb4` (merge `13a9d4a`) | deferred | agent: general-purpose. 11 commits. Not run: lint (known broken), browser UI flows (AC1.7/1.8 verified via curl/service). Resumed once after API session limit. |
+| 2. Subscriptions | done | `bacd3ee` (merge `6df9daa`) | deferred | agent: general-purpose. 6 commits. Not run: mobile-width screenshots, plan-card click submit (request made via curl), security review. |
+| 3. Business + customers | done | `fcfd65a` (merge `501f631`) | deferred | agent: general-purpose. 9 commits; resumed once after API limit. dev now: tsc OK, 246 tests pass. Not run: mobile width, dark mode/keyboard, security review; CUSTOMER_HAS_DOCUMENTS untested until P4 FK. |
+| 4. Documents core | done | `1ff40f7` (merge `28109f3`) | deferred | agent: general-purpose. 5 commits. dev: tsc OK, 312 tests pass, migrations up to date. Not run: desktop-width, note/original-picker + discount/exemption UI in browser, build, real print/PDF. |
+| 5. ZATCA crypto lib | done (AC5.8 open → AC6.4) | `1743b95` (merge `ae41c5e`) | deferred | agent: general-purpose. 16 commits. Not run: full suite, build, live ZATCA, golden vs real SDK samples (skipped). |
+| 6. Onboarding + client | done offline; live gate pending | `bba2c99` (merge `51031c2`) | deferred | agent: general-purpose. 8 commits. AC6.4/6.5 = USER live Simulation run (steps in docs/context/07-zatca-onboarding.md). security-review skill failed to launch (no merge base vs origin/HEAD) → manual diff review, no HIGH; formal /security-review to run in Cross-Validation. Page never rendered in browser. |
+| 7. Issuance pipeline | done offline; live AC7.11 pending | merge `a90319a` | deferred | agent: general-purpose. 6 commits. 344 tests, tsc OK, one next build OK. Not run: live ZATCA happy path, QR scan, mobile, formal security review, real print. One real Simulation call with fake creds → 401 handled. |
+| Cross-Validation | done (fixes merged; live gates pending) | `740c4aa` (merge on dev) | 1 review pass, 20 findings: 5 must + 11 should fixed, 4 deferred | tsc OK, 390 tests, build OK (with dummy RESEND vars), migrations up to date, purity grep empty. Fixes were not re-reviewed by a second agent. |
+
+Execution decisions (user-approved 2026-10-14): phase branches are based on local `dev` (not `main`) and merged `--no-ff` into local `dev` after ACs pass; nothing pushed without a per-push yes; force push of `main` run by the user. Parallel lanes after P1: Lane A P2→P3→P4 (shared schema), Lane B P5 in a separate worktree; P6 after P3+P5; P7 after P4+P6. Commits carry no attribution trailers (repo git-hygiene rule).
+
+### Phase 0 — Bootstrap
+
+- [ ] AC0.1: pending user force push.
+- [x] AC0.2: bundle verify exit 0 (`..\fatoora-saas-v2-origin-backup-93792d2.bundle`).
+- [x] AC0.3: ls-files grep empty.
+- [~] AC0.4: 30 matches, all placeholders/fixtures (`.env.example` postgres:postgres@localhost, db-target test fixtures, this plan's own regex line). Agent compared all real values from gadget `.env`/`.env.dev` against staged files: none present.
+- [x] AC0.5: gadget-website status identical (empty) before/after, HEAD 9c14d44.
+- Deviations: AC0.4 regex self-matches the plan; accepted on manual comparison. No attribution trailers per git-hygiene.
+
+### Phase 4 — Documents core
+
+- [x] AC4.1-AC4.4: vat-engine.test.ts (11 tests).
+- [x] AC4.5-AC4.8: route + service tests.
+- [x] AC4.9: 20 parallel allocateNumber → 1..20 no gaps; numeric sort.
+- [x] AC4.10: browser DOM + screenshots (mobile width only).
+- Orchestrator re-ran on merged dev: tsc OK, 312 tests, migrate status up to date.
+- Deviations: plan assumption `onDelete: Restrict` false (SQLSTATE 23001 not mapped by Prisma) → `NoAction` (second migration); tsconfig target ES2017→ES2020 (bigint); tax subtotals grouped per (category, rate, exemption reason); 422 for validation; amount cap AMOUNT_TOO_LARGE; notes must reference same-subtype INVOICE. Merge conflict in docs/context/05-frontend.md resolved by keeping both lines.
+
+### Phase 5 — ZATCA crypto lib
+
+- [~] AC5.1/AC5.2: golden test skipped pending `tools/zatca-samples/`; ran once against the SDK-derived sample shipped in zatca-xml-js (1/1, all digests + signature match), then removed.
+- [x] AC5.3: crosscheck vs zatca-xml-js, 3 fixtures (hash + QR byte-equal).
+- [x] AC5.4: tag 1 = 25 UTF-8 bytes (plan said 26 — plan arithmetic error); 256-byte value throws.
+- [x] AC5.5: CSR parse-back for both envs.
+- [x] AC5.6: deterministic builder; standard CN content.
+- [x] AC5.7: purity grep empty (orchestrator re-ran).
+- [ ] AC5.8: open until AC6.4.
+- Orchestrator re-ran: tsc OK; src/server/zatca 59 pass / 1 skipped.
+- Deviations (evidence-driven, matched to SDK-signed sample + ZATCA staff forum t/717): cert digest = base64(hex(SHA-256(cert base64 text))); SignedProperties digest = base64(hex(SHA-256)) over fixed serialization; SigningTime with Z; standard docs carry 9-tag QR (replaced at clearance); string writer for XML (xmldom parse only); inclusive C14N 1.1; xpath dropped; @peculiar/x509 dev-only. Pending Simulation confirmation: SIGNATURE_INPUT raw hash bytes, IssueTime Z, cbc:Note on notes, line allowance placement, empty buyer party for simplified, X509IssuerName format.
+
+### Phase 2 — Subscriptions
+
+- [x] AC2.1: 201 PENDING (service, route test, curl).
+- [x] AC2.2: 409 SUBSCRIPTION_PENDING; parallel race test → 1 row (partial unique index is sole guard).
+- [x] AC2.3: 401 anon, 403 admin; invalid plan → 422 (see deviation).
+- [x] AC2.4: Jan 31 + 1 month → Feb 28 (service test).
+- [x] AC2.5: 409 / 404 / 401-403.
+- [x] AC2.6: stacking dates (service test).
+- [x] AC2.7: NONE/PENDING/ACTIVE/EXPIRED tests.
+- [x] AC2.8: redirects verified via curl + Chrome.
+- [x] AC2.9: /api/app/ping 402 / 200.
+- [x] AC2.10: Chrome click-through, no reload.
+- Orchestrator re-ran: tsc OK; subscriptions tests 20/20.
+- Deviations: Zod validation errors return 422 (repo `jsonError` convention) where plan says 400 — applies to all later "400 validation" ACs. Admin create/update user routes + contract removed (admins seed-created). Login redirect done via server redirect on `/`.
+
+### Phase 1 — Strip + rebrand
+
+- [x] AC1.1: tsc exit 0 (orchestrator re-ran).
+- [x] AC1.2: vitest 16 files / 148 tests pass (orchestrator re-ran).
+- [x] AC1.3: next build exit 0 (agent).
+- [x] AC1.4: grep rc=1 (orchestrator re-ran).
+- [x] AC1.5: single `20261013225758_init`; db:status up to date.
+- [x] AC1.6: money.test.ts cases pass.
+- [x] AC1.7: admin credentials login 302 → /dashboard via curl (not browser).
+- [x] AC1.8: signup USER + devCode, unverified login refused, verifyEmail via service script (UI not exercised).
+- [x] AC1.9: USER → /dashboard 307 to login; /api/admin/users 401.
+- Deviations: extra leftover-file deletions per user instruction (unused UI primitives, public/ images, seo/marketing skills, unused deps, backfill script); redis key prefix `gw:` → fatoora; nav-secondary removed. First commit 8fddf5c does not typecheck alone (fixed by 89b15b5). Carry to cross-validation: local .env.dev points at user's remote Upstash (fail-open timeouts); avatars with remote URLs (no image hosts) logged in KNOWN-ISSUES.
+
+
+## Cross-Validation decisions (user, 2026-10-14)
+- Expired subscribers keep READ-ONLY access to already-issued records (xml, list/detail, print); all writes stay gated. Implemented in branch fix/cross-validation-findings.
+- No product/service catalog: invoice lines stay free text (by design).
+- Leftover workflow skills dropped (.claude/skills: execute-with-me, plan-with-me, handoff, thermo-nuclear-code-review, openai.yaml files); kept git-hygiene, code-review, grilling, supercharged-*.
+- Admin visibility of business data: deferred, see Open decision section.
+- Reviewer items deferred (not implemented): unbounded admin users list (17), rate limits on issue/create/retry (18), Origin check CSRF hardening (19).
+
+
+## Final Status
+
+**Status: COMPLETE offline, ready for PR (dev → main); live ZATCA gates pending the user.** (2026-10-14)
+
+Shipped on local `dev` (nothing pushed): P1 strip+rebrand, P2 subscriptions, P3 business/EGS/customers, P4 documents core, P5 ZATCA crypto lib, P6 onboarding + client, P7 issuance pipeline, plus `fix/cross-validation-findings` (security/correctness fixes, expired-subscriber read-only access, leftover deletions).
+
+Verified: `tsc --noEmit --incremental false` OK; vitest 390 pass / 1 skipped (golden, no samples); `next build` OK with dummy `RESEND_API_KEY`/`EMAIL_FROM`; `prisma migrate status` up to date (8 migrations); `src/server/zatca` purity grep empty.
+
+Pending (user): (1) force-push `main` over origin 93792d2 (AC0.1) then push `dev`; (2) copy SDK sample XMLs to `tools/zatca-samples/` to un-skip golden tests (AC5.1/5.2); (3) live Simulation: `npm run zatca:sim-check -- --otp <OTP>` (AC6.4), in-app onboarding (AC6.5), AC7.11 steps in docs/context/07-zatca-onboarding.md; (4) set RESEND_API_KEY/EMAIL_FROM, ZATCA_ENCRYPTION_KEY, CRON_SECRET, NEXTAUTH_* in Vercel (all envs incl. previews) and a new prod Prisma Postgres + `migrate deploy`; (5) rotate gadget-website NEXTAUTH_SECRET if prod uses the placeholder; (6) decisions: admin visibility, deferred hardening (admin users pagination, issue rate limits, Origin/CSRF check).
+
+Assumptions to confirm at the Simulation gate: SIGNATURE_INPUT raw hash bytes, SigningTime with Z, IssueTime Z, 9-tag QR on standard docs, X509IssuerName format, response field names, duplicate-response shape (409 / 400 'duplicate|already' → DUPLICATE), clearance 200 = CLEARED.
