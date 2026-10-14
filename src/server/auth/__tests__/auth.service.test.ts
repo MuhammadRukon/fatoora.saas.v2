@@ -7,7 +7,7 @@
  * The mailer is a no-op without RESEND_API_KEY, so no mocking is needed.
  */
 import bcrypt from 'bcryptjs';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@/lib/prisma';
 import {
@@ -30,6 +30,7 @@ function freshEmail() {
 }
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   if (usedEmails.length === 0) return;
   const emails = usedEmails.splice(0);
   await prisma.user.deleteMany({ where: { email: { in: emails } } });
@@ -43,6 +44,20 @@ describe('authService.signup', () => {
     await expect(
       authService.signup({ name: 'Test', email, password: 'password123' }),
     ).rejects.toBeInstanceOf(ConflictError);
+  });
+});
+
+describe('dev secrets exposure', () => {
+  it('returns devCode/devVerifyToken in dev without a mailer, never in production', async () => {
+    const dev = await authService.signup({ name: 'Test', email: freshEmail(), password: 'password123' });
+    expect(dev.devCode).toMatch(/^\d{6}$/);
+    vi.stubEnv('NODE_ENV', 'production');
+    const prod = await authService.signup({ name: 'Test', email: freshEmail(), password: 'password123' });
+    expect(prod.devCode).toBeNull();
+    expect(prod.devVerifyToken).toBeNull();
+    const resent = await authService.resendVerification(prod.email);
+    expect(resent.devCode).toBeNull();
+    expect(resent.devVerifyToken).toBeNull();
   });
 });
 
