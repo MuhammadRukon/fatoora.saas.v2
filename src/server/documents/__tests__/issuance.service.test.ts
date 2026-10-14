@@ -190,7 +190,11 @@ describe('issuance.issueAndSubmit', () => {
       await issuanceService.issueAndSubmit(business.id, d.id, deps(bad.fetchImpl, new Date(NOW.getTime() + i * 1000)));
     }
     const ok = mockGateway();
-    const { processed } = await issuanceService.retryPending(deps(ok.fetchImpl));
+    // Other test files share the table and the 50 cap, so a few rounds may be needed to reach ours.
+    let processed = 0;
+    for (let round = 0; round < 5 && (await prisma.document.count({ where: { id: { in: ids }, submissionStatus: 'PENDING_RETRY' } })); round++) {
+      processed += (await issuanceService.retryPending(deps(ok.fetchImpl, new Date(NOW.getTime() + 10_000 * (round + 1))))).processed;
+    }
     expect(processed).toBeGreaterThanOrEqual(3);
     const mine = (await Promise.all(ids.map((id) => row(id)))).map((r) => r.uuid);
     // Other test files may have pending documents too; only the relative order of ours matters.
