@@ -1,6 +1,6 @@
 # API Reference
 
-All routes live under `src/app/api/**`. Auth levels: **public**, **user** (`requireUserSession`: role USER, 403 for an admin), **app** (`requireAppSession`: USER with an ACTIVE subscription, else 402 `SUBSCRIPTION_REQUIRED`), **app-read** (`requireAppReadSession`: like app, but an EXPIRED subscription may also read; used only by the GET routes over issued documents), **admin** (`requireAdminSession`). Bodies are validated with Zod contracts from `src/contracts/**`. Rate-limited routes return 429 + `Retry-After`.
+All routes live under `src/app/api/**`. Auth levels: **public**, **user** (`requireUserSession`: role USER, 403 for an admin), **app** (`requireAppSession`: USER with an ACTIVE subscription, else 402 `SUBSCRIPTION_REQUIRED`), **app-read** (`requireBusinessReadContext`: like app, but an EXPIRED subscription may also read; used only by the GET routes over issued documents), **admin** (`requireAdminSession`). Bodies are validated with Zod contracts from `src/contracts/**`. Rate-limited routes return 429 + `Retry-After`.
 
 ## Auth
 

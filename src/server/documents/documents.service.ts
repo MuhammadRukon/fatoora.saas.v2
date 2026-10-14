@@ -18,15 +18,19 @@ import { lineToInput } from './lines';
 import { buyerParty, sellerParty } from './parties';
 import { computeDocument, STANDARD_RATE_BP } from './vat-engine';
 
-const include = {
-  lines: { orderBy: { position: 'asc' } },
-  business: true,
-  customer: true,
-  billingReference: { select: { id: true, number: true } },
-  egsUnit: { select: { lastError: true } },
-} satisfies Prisma.DocumentInclude;
+/** DTO reads: relations toDTO needs, without the signed/cleared XML (only the xml route and submit() read those). */
+const dtoArgs = {
+  include: {
+    lines: { orderBy: { position: 'asc' } },
+    business: true,
+    customer: true,
+    billingReference: { select: { id: true, number: true } },
+    egsUnit: { select: { lastError: true } },
+  },
+  omit: { signedXml: true, clearedXml: true },
+} satisfies Prisma.DocumentDefaultArgs;
 
-type DocumentRow = Prisma.DocumentGetPayload<{ include: typeof include }>;
+type DocumentRow = Prisma.DocumentGetPayload<typeof dtoArgs>;
 
 const iso = (d: Date | null) => d?.toISOString() ?? null;
 
@@ -167,7 +171,7 @@ function draftColumns(data: DocumentDraftData, totals: ReturnType<typeof compute
 }
 
 async function loadInTx(tx: Prisma.TransactionClient, businessId: string, id: string) {
-  const row = await tx.document.findFirst({ where: { id, businessId }, include });
+  const row = await tx.document.findFirst({ where: { id, businessId }, ...dtoArgs });
   if (!row) throw new NotFoundError('Document');
   return row;
 }
@@ -178,18 +182,20 @@ export const documentsService = {
     const { lines, totals } = compute(data);
     return prisma.$transaction(async (tx) => {
       const billingReferenceId = await checkReferences(tx, businessId, data);
-      const created = await tx.document.create({
-        data: { ...draftColumns(data, totals, billingReferenceId), businessId, lines: { create: lines } },
-        select: { id: true },
-      });
-      return toDTO(await loadInTx(tx, businessId, created.id));
+      return toDTO(
+        await tx.document.create({
+          data: { ...draftColumns(data, totals, billingReferenceId), businessId, lines: { create: lines } },
+          ...dtoArgs,
+        }),
+      );
     });
   },
 
   updateDraft(businessId: string, id: string, data: DocumentDraftData): Promise<DocumentDTO> {
     const { lines, totals } = compute(data);
     return prisma.$transaction(async (tx) => {
-      const current = await loadInTx(tx, businessId, id);
+      const current = await tx.document.findFirst({ where: { id, businessId }, select: { status: true } });
+      if (!current) throw new NotFoundError('Document');
       if (current.status !== 'DRAFT') throw immutableError();
       const billingReferenceId = await checkReferences(tx, businessId, data);
       // The status guard keeps this safe if the document is issued between the read and the write.
@@ -212,7 +218,7 @@ export const documentsService = {
   },
 
   async get(businessId: string, id: string): Promise<DocumentDTO> {
-    const row = await prisma.document.findFirst({ where: { id, businessId }, include });
+    const row = await prisma.document.findFirst({ where: { id, businessId }, ...dtoArgs });
     if (!row) throw new NotFoundError('Document');
     return toDTO(row);
   },
@@ -295,7 +301,11 @@ export const documentsService = {
 
   /** Copies a document (any status) into a new DRAFT, e.g. to correct a rejected one. */
   async duplicateAsDraft(businessId: string, id: string): Promise<DocumentDTO> {
-    const src = await prisma.document.findFirst({ where: { id, businessId }, include: { lines: { orderBy: { position: 'asc' } } } });
+    const src = await prisma.document.findFirst({
+      where: { id, businessId },
+      include: { lines: { orderBy: { position: 'asc' } } },
+      omit: { signedXml: true, clearedXml: true },
+    });
     if (!src) throw new NotFoundError('Document');
     return documentsService.createDraft(businessId, {
       kind: src.kind,

@@ -191,8 +191,9 @@ async function issue(businessId: string, documentId: string, opts: IssuanceOptio
           submissionStatus: 'PENDING_RETRY',
           isTest: environment === 'SIMULATION',
         },
+        select: { id: true },
       });
-      await tx.egsUnit.update({ where: { id: egs.id }, data: { lastIcv: icv, lastInvoiceHash: invoiceHash } });
+      await tx.egsUnit.update({ where: { id: egs.id }, data: { lastIcv: icv, lastInvoiceHash: invoiceHash }, select: { id: true } });
       return documentId;
     },
     { maxWait: 30_000, timeout: 60_000 },
@@ -217,8 +218,12 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
   });
   if (!claimed.count) return; // already submitted, or another worker has it
 
+  let released = false; // set once the outcome write has cleared the lease
   try {
-    const doc = await prisma.document.findUniqueOrThrow({ where: { id: documentId }, include: { egsUnit: true } });
+    const doc = await prisma.document.findUniqueOrThrow({
+      where: { id: documentId },
+      select: { subtype: true, signedXml: true, uuid: true, invoiceHash: true, egsUnit: true },
+    });
     const egs = doc.egsUnit;
     if (!egs?.productionCsidEnc || !egs.productionSecretEnc || !doc.signedXml || !doc.uuid || !doc.invoiceHash) {
       log.error('zatca.submit_missing_credentials', { documentId });
@@ -260,6 +265,7 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
           ? 'ZATCA reports this document already cleared; clearance XML unavailable, check the Fatoora portal'
           : 'ZATCA reports this document already received; confirm in the Fatoora portal';
     const data: Prisma.DocumentUpdateInput = {
+      submittingSince: null,
       submissionAttempts: { increment: 1 },
       lastAttemptAt: now,
       zatcaResponse: {
@@ -293,11 +299,13 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
     }
     try {
       await prisma.document.update({ where: { id: documentId }, data });
+      released = true;
     } catch (err) {
       // ZATCA has answered but the outcome was not saved: retry once; a resubmission would later answer DUPLICATE.
       log.error('zatca.outcome_write_failed', { documentId, error: errMsg(err) });
       try {
         await prisma.document.update({ where: { id: documentId }, data });
+        released = true;
       } catch (err2) {
         log.error('zatca.outcome_lost', { documentId, httpStatus: res.httpStatus, outcome: res.outcome, error: errMsg(err2) });
         throw err2;
@@ -308,7 +316,12 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
       await prisma.egsUnit.updateMany({ where: { id: egs.id, lastError: { startsWith: AUTH_ERROR_PREFIX } }, data: { lastError: null } });
     }
   } finally {
-    await prisma.document.update({ where: { id: documentId }, data: { submittingSince: null } });
+    if (!released) {
+      // Never let a failed release mask the original error; the lease expires on its own after LEASE_MS.
+      await prisma.document
+        .updateMany({ where: { id: documentId }, data: { submittingSince: null } })
+        .catch((err) => log.error('zatca.lease_release_failed', { documentId, error: errMsg(err) }));
+    }
   }
 }
 
