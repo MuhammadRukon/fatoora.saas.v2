@@ -39,7 +39,7 @@ const NAV: NavItem[] = [
   { title: 'Invoices', icon: IconFileInvoice },
   { title: 'Customers', url: '/app/customers', icon: IconUsers },
   { title: 'Business', url: '/app/business', icon: IconBuildingStore },
-  { title: 'ZATCA', icon: IconShieldCheck },
+  { title: 'ZATCA', url: '/app/zatca', icon: IconShieldCheck },
 ];
 
 const isCurrent = (pathname: string, url: string) =>

@@ -8,3 +8,6 @@ export { signInvoice, verifySignedInvoice, SIGNATURE_INPUT } from './sign';
 export { buildQrTlv, parseQrTlv, ZatcaQrError, type QrFields } from './qr';
 export { buildCsr, generateKeyPair, type CsrInput, type ZatcaEnvironment } from './csr';
 export { certificateFromToken, certificateInfo } from './certificate';
+export * from './crypto-box';
+export * from './client';
+export * from './compliance-docs';

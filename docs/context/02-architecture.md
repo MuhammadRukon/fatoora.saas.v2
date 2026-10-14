@@ -34,7 +34,7 @@ UI (src/app pages, src/modules components/hooks)
 - An issued document is never mutated; a correction is a new document.
 - Allocate ICV and PIH under a row lock in one transaction; the ICV never resets and has no gaps.
 - Persist a signed document before any network call to ZATCA.
-- ZATCA crypto lives in `src/server/zatca/` as pure Node functions (no Prisma, no Next, no network).
+- ZATCA crypto lives in `src/server/zatca/` as pure Node functions (no Prisma, no Next, no env; the gateway client takes an injected `fetch`).
 
 ## Rate limiting and logging
 

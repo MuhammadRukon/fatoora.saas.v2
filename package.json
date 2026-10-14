@@ -6,6 +6,7 @@
     "node": "24.x"
   },
   "scripts": {
+    "zatca:sim-check": "dotenv -e .env.dev -- tsx scripts/zatca-sim-check.ts",
     "db:guard": "dotenv -e .env.dev -- tsx scripts/assert-db-target.ts",
     "predev": "npm run db:guard",
     "dev": "dotenv -e .env.dev -- next dev --turbopack",
