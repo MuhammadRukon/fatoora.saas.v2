@@ -32,3 +32,23 @@ Offline check: `npm run zatca:sim-check -- --dry-run` builds and signs the 6 doc
 - Seller name on documents is `nameAr`; CSR `O` is `nameEn`, `OU` is `<city> Branch`, registered address is `<building> <street>, <district>, <city>`.
 - The same Fatoora portal URL serves Simulation and Production.
 - `/compliance/invoices` accepts the same body as reporting: `{invoiceHash, uuid, invoice}`.
+
+## Issuing documents (Phase 7)
+
+`src/server/documents/issuance.service.ts`. `issue` runs one transaction: lock the active EGS row, lock the draft, check issue-time rules (standard buyer complete, original issued and same type, supply date not in the future), snapshot seller and buyer, `allocateNumber`, new UUID, `icv = lastIcv + 1`, `pih = lastInvoiceHash`, build and sign (key and cert decrypted in memory), persist the document as ISSUED with `submissionStatus PENDING_RETRY` and advance the EGS chain. Only then `submit` runs, outside the transaction: SIMPLIFIED is reported, STANDARD is cleared (a 303 falls back to reporting). Outcomes: PASS/WARNING -> REPORTED or CLEARED (cleared XML and its QR stored), 400 -> REJECTED (final; the chain stays advanced; "Create corrected copy" makes a new draft), network/5xx -> stays PENDING_RETRY, 401/403 -> stays PENDING_RETRY and sets the EGS `lastError` ("re-onboard required"). The document-to-XML mapping is `src/server/documents/zatca-mapper.ts`.
+
+## AC7.11: live Simulation run (user)
+
+Prerequisite: the EGS is onboarded in Simulation (AC6.5). Needs a real Simulation OTP, so it cannot run in CI.
+
+1. Create a customer with a complete Saudi address and VAT number (street, building number, district, city, postal code).
+2. Issue a SIMPLIFIED invoice (any line, 15%): open the draft, click "Issue to ZATCA", confirm. Expect status Reported with no warnings.
+3. Create a simplified credit note against it (New > Credit note, pick the invoice, give a reason) and issue it. Expect Reported.
+4. Issue a STANDARD invoice to the customer from step 1 (set a supply date on or before today). Expect Cleared. Then a standard debit note against it. Expect Cleared.
+5. On the simplified invoice open Print view, scan the QR with the ZATCA VAT app: the total must equal the invoice total (tag 4). Check the Simulation watermark is shown.
+6. Force a rejection: create a customer with an invalid but well-formed VAT number (for example change the last digit so the check fails), insert it directly with Prisma Studio (`npm run db:studio`), and issue a STANDARD invoice to it. Expect Rejected with ZATCA's messages shown. Then issue another valid simplified invoice: it must be accepted (PIH after a rejection uses the rejected document's hash).
+7. Pass criteria: documents of steps 2-4 end Reported or Cleared with `hasWarnings` false; step 6's follow-up document is accepted. Record any warning or error text and send it back (the raw response is in `Document.zatcaResponse`).
+
+Cron check (optional): `curl -H "Authorization: Bearer $CRON_SECRET" https://<app>/api/cron/zatca-retry` returns `{"processed": n}`; without the header it returns 401.
+
+Assumptions the Simulation run must confirm: the clearance response carries `clearedInvoice` (base64 XML) and the cleared XML contains the QR as `cbc:EmbeddedDocumentBinaryObject` under `AdditionalDocumentReference` `QR`; a 200 on clearance means CLEARED; a 202 means accepted with warnings; the seller registration name (Arabic) and a buyer name taken from `name`.

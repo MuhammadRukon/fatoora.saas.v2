@@ -47,3 +47,9 @@ export function parseQrTlv(base64: string): Record<number, Buffer> {
   }
   return tags;
 }
+
+/** The QR stamp (base64 TLV) inside a cleared or signed invoice XML, or undefined when absent. */
+export function extractQrFromXml(xml: string): string | undefined {
+  const m = /<cbc:ID>QR<\/cbc:ID>[\s\S]*?<cbc:EmbeddedDocumentBinaryObject[^>]*>\s*([^<\s]+)\s*</.exec(xml);
+  return m?.[1];
+}

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { IconAlertCircle, IconCopy, IconPrinter } from '@tabler/icons-react';
+import { IconAlertCircle, IconAlertTriangle, IconCopy, IconDownload, IconPrinter, IconRefresh, IconSend } from '@tabler/icons-react';
 
 import { Loader } from '@/components/common/loader';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -20,8 +20,8 @@ import {
 } from '@/contracts/documents';
 import { ApiClientError } from '@/lib/fetcher';
 
-import { formatAmount } from '../format';
-import { useDeleteDocument, useDocument, useDuplicateDocument } from '../hooks';
+import { formatAmount, printState } from '../format';
+import { useDeleteDocument, useDocument, useDuplicateDocument, useIssueDocument, useRetryDocument } from '../hooks';
 import { DocumentForm } from './document-form';
 import { StatusBadges } from './status-badges';
 
@@ -77,6 +77,10 @@ function DetailHeader({ doc }: { doc: DocumentDTO }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const remove = useDeleteDocument(doc.id);
   const duplicate = useDuplicateDocument(doc.id);
+  const issue = useIssueDocument(doc.id);
+  const retry = useRetryDocument(doc.id);
+  const [confirmIssue, setConfirmIssue] = useState(false);
+  const print = printState(doc);
 
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
@@ -90,22 +94,55 @@ function DetailHeader({ doc }: { doc: DocumentDTO }) {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button asChild variant="outline">
-          <Link href={`/app/invoices/${doc.id}/print`}>
+        {print.allowed ? (
+          <Button asChild variant="outline">
+            <Link href={`/app/invoices/${doc.id}/print`}>
+              <IconPrinter />
+              Print view
+            </Link>
+          </Button>
+        ) : (
+          <Button variant="outline" disabled title={print.reason}>
             <IconPrinter />
             Print view
-          </Link>
-        </Button>
+          </Button>
+        )}
+        {doc.status === 'ISSUED' ? (
+          <Button asChild variant="outline">
+            <a href={`/api/app/documents/${doc.id}/xml`} download>
+              <IconDownload />
+              Download XML
+            </a>
+          </Button>
+        ) : null}
+        {doc.submissionStatus === 'PENDING_RETRY' ? (
+          <Button disabled={retry.isPending} onClick={() => retry.mutate()}>
+            {retry.isPending ? <Loader /> : <IconRefresh />}
+            Retry submission
+          </Button>
+        ) : null}
         <Button
-          variant="outline"
+          variant={doc.submissionStatus === 'REJECTED' ? 'default' : 'outline'}
           disabled={duplicate.isPending}
           onClick={() => duplicate.mutate(undefined, { onSuccess: (copy) => router.push(`/app/invoices/${copy.id}`) })}
         >
           {duplicate.isPending ? <Loader /> : <IconCopy />}
-          Duplicate as draft
+          {doc.submissionStatus === 'REJECTED' ? 'Create corrected copy' : 'Duplicate as draft'}
         </Button>
         {doc.status === 'DRAFT' ? (
           <>
+            <Button disabled={issue.isPending} onClick={() => setConfirmIssue(true)}>
+              {issue.isPending ? <Loader /> : <IconSend />}
+              Issue to ZATCA
+            </Button>
+            <ConfirmDialog
+              open={confirmIssue}
+              onOpenChange={setConfirmIssue}
+              title="Issue this document?"
+              description="It gets its number, is signed and sent to ZATCA. Issued documents can't be changed or deleted. The saved draft is issued, so save any edits first."
+              confirmLabel="Issue"
+              onConfirm={() => issue.mutate()}
+            />
             <Button
               variant="ghost"
               className="text-destructive hover:bg-destructive/10 hover:text-destructive"
@@ -158,6 +195,7 @@ function Party({ title, party }: { title: string; party: PartySnapshot | null })
 function IssuedView({ doc }: { doc: DocumentDTO }) {
   return (
     <div className="flex flex-col gap-8">
+      <SubmissionPanel doc={doc} />
       <p className="text-sm text-muted-foreground">
         Issued documents can&apos;t be changed. To correct one, issue a credit or debit note, or duplicate it as a new draft.
       </p>
@@ -225,3 +263,68 @@ const Total = ({ label, value }: { label: string; value: number }) => (
     <dd>{formatAmount(value)}</dd>
   </div>
 );
+
+/** ZATCA's verdict in words: errors and warnings from the last response, and what to do next. */
+function SubmissionPanel({ doc }: { doc: DocumentDTO }) {
+  const { submissionStatus: s } = doc;
+  const attempts = `${doc.submissionAttempts} attempt${doc.submissionAttempts === 1 ? '' : 's'}`;
+  if (s === 'NOT_SUBMITTED') return null;
+  if (s === 'REPORTED' || s === 'CLEARED') {
+    return (
+      <div className="flex flex-col gap-2" data-testid="submission-panel">
+        <p className="text-sm text-muted-foreground">
+          {s === 'CLEARED' ? 'Cleared' : 'Reported'} by ZATCA ({attempts}).
+        </p>
+        {doc.hasWarnings ? <Messages title="ZATCA warnings" items={doc.submissionWarnings} /> : null}
+      </div>
+    );
+  }
+  return (
+    <Alert variant={s === 'REJECTED' ? 'destructive' : 'default'} data-testid="submission-panel">
+      {s === 'REJECTED' ? <IconAlertCircle /> : <IconAlertTriangle />}
+      <AlertTitle>{s === 'REJECTED' ? 'Rejected by ZATCA' : 'Not yet accepted by ZATCA'}</AlertTitle>
+      <AlertDescription>
+        {s === 'REJECTED' ? (
+          <>
+            <p>This document is final and keeps its number. Create a corrected copy to issue a replacement.</p>
+            <Messages items={doc.submissionErrors} />
+          </>
+        ) : (
+          <>
+            <p>
+              The signed document is saved ({attempts}).{doc.reonboardRequired ? '' : ' Use Retry submission; a daily job also retries it.'}
+              {doc.subtype === 'SIMPLIFIED'
+                ? ' Simplified invoices must be reported within 24 hours of issue.'
+                : ' The buyer must not receive it until ZATCA clears it.'}
+            </p>
+            {doc.reonboardRequired ? (
+              <p className="mt-1 font-medium">
+                ZATCA refused the unit&apos;s credentials: re-onboard required.{' '}
+                <Link href="/app/zatca" className="underline underline-offset-4">
+                  Open ZATCA setup
+                </Link>
+              </p>
+            ) : null}
+            <Messages items={doc.submissionErrors} />
+          </>
+        )}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+function Messages({ title, items }: { title?: string; items: string[] }) {
+  if (!items.length) return null;
+  return (
+    <div className="mt-2">
+      {title ? <p className="text-sm font-medium">{title}</p> : null}
+      <ul className="list-disc pl-5 text-sm">
+        {items.map((m, i) => (
+          <li key={i} className="break-words">
+            {m}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}

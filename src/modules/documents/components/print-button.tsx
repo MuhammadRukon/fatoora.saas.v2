@@ -4,9 +4,9 @@ import { IconPrinter } from '@tabler/icons-react';
 
 import { Button } from '@/components/ui/button';
 
-export function PrintButton() {
+export function PrintButton({ disabled }: { disabled?: boolean }) {
   return (
-    <Button onClick={() => window.print()}>
+    <Button disabled={disabled} onClick={() => window.print()}>
       <IconPrinter />
       Print
     </Button>

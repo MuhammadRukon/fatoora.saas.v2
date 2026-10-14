@@ -1,9 +1,11 @@
 import Link from 'next/link';
-import { IconBuildingStore, IconChevronRight, IconUsers } from '@tabler/icons-react';
+import { IconAlertTriangle, IconBuildingStore, IconChevronRight, IconUsers } from '@tabler/icons-react';
 
 import { auth } from '@/auth';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ZATCA_ENVIRONMENT_LABELS } from '@/contracts/business';
 import { businessService } from '@/server/business/business.service';
+import { documentsService } from '@/server/documents/documents.service';
 
 const LINKS = [
   { href: '/app/customers', title: 'Customers', text: 'Add the businesses and people you invoice.', icon: IconUsers },
@@ -14,6 +16,7 @@ const LINKS = [
 export default async function AppHome() {
   const session = await auth();
   const business = session?.user ? await businessService.getMine(session.user.id) : null;
+  const overdue = business ? await documentsService.countUnreportedSimplified(business.id) : 0;
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8">
@@ -30,6 +33,18 @@ export default async function AppHome() {
           </p>
         ) : null}
       </div>
+      {overdue ? (
+        <Alert variant="destructive" data-testid="overdue-banner">
+          <IconAlertTriangle />
+          <AlertTitle>Report before the 24h deadline</AlertTitle>
+          <AlertDescription>
+            {overdue} simplified {overdue === 1 ? 'invoice has' : 'invoices have'} not reached ZATCA yet and {overdue === 1 ? 'is' : 'are'} more than 18 hours old.{' '}
+            <Link href="/app/invoices?submissionStatus=PENDING_RETRY" className="font-medium underline underline-offset-4">
+              Review and retry
+            </Link>
+          </AlertDescription>
+        </Alert>
+      ) : null}
       <ul className="divide-y border">
         {LINKS.map((link) => (
           <li key={link.href}>
