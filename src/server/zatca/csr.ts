@@ -14,6 +14,8 @@ import {
 } from 'pkijs';
 
 export type ZatcaEnvironment = 'SIMULATION' | 'PRODUCTION';
+/** Dev-only superset used by scripts/zatca-sim-check.ts --sandbox (developer portal). Never persisted or exposed. */
+export type ZatcaDevEnvironment = ZatcaEnvironment | 'SANDBOX';
 
 /** secp256k1 key pair (node:crypto; WebCrypto has no secp256k1). */
 export function generateKeyPair() {
@@ -26,9 +28,10 @@ export function generateKeyPair() {
 }
 
 // Certificate template name (MS OID) per environment: ZATCA staff, forum t/4028.
-const TEMPLATE_NAME: Record<ZatcaEnvironment, string> = {
+const TEMPLATE_NAME: Record<ZatcaDevEnvironment, string> = {
   SIMULATION: 'PREZATCA-Code-Signing',
   PRODUCTION: 'ZATCA-Code-Signing',
+  SANDBOX: 'TSTZATCA-Code-Signing',
 };
 
 const OID = {
@@ -60,7 +63,7 @@ const utf8 = (value: string) => new Utf8String({ value });
 export type CsrInput = {
   privateKeyPem: string;
   publicKeyPem: string;
-  env: ZatcaEnvironment;
+  env: ZatcaDevEnvironment;
   commonName: string;
   serialNumber: string; // "1-<solution>|2-<model/version>|3-<device serial>"
   vatNumber: string;

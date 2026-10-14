@@ -1,4 +1,4 @@
-import type { ZatcaEnvironment } from './csr';
+import type { ZatcaDevEnvironment } from './csr';
 
 // ZATCA gateway client. Pure and injectable: fetch and logger are arguments, nothing reads env or the DB.
 // Response JSON shapes are unverified until the Simulation gate (AC6.4), so bodies are kept whole and parsed defensively.
@@ -48,8 +48,8 @@ function outcomeFor(status: number, body: unknown): ZatcaOutcome {
   return 'SERVER_ERROR';
 }
 
-export function createZatcaClient(env: ZatcaEnvironment, fetchImpl: typeof fetch = fetch, opts: Options = {}) {
-  const base = `https://gw-fatoora.zatca.gov.sa/e-invoicing/${env === 'PRODUCTION' ? 'core' : 'simulation'}`;
+export function createZatcaClient(env: ZatcaDevEnvironment, fetchImpl: typeof fetch = fetch, opts: Options = {}) {
+  const base = `https://gw-fatoora.zatca.gov.sa/e-invoicing/${{ PRODUCTION: 'core', SIMULATION: 'simulation', SANDBOX: 'developer-portal' }[env]}`;
 
   async function post(path: string, body: unknown, extra: Record<string, string>): Promise<ZatcaResponse> {
     const headers = { 'Accept-Version': 'V2', 'Accept-Language': 'en', 'Content-Type': 'application/json', ...extra };
