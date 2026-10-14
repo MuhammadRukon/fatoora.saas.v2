@@ -64,7 +64,10 @@ export default async function proxy(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return NextResponse.next();
+  // The /app layout needs the path to decide read-only access for an EXPIRED subscription.
+  const headers = new Headers(req.headers);
+  headers.set('x-pathname', pathname);
+  return NextResponse.next({ request: { headers } });
 }
 
 export const config = {

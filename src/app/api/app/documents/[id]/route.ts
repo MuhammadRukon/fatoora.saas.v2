@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { documentDraftSchema } from '@/contracts/documents';
 import { documentsService } from '@/server/documents/documents.service';
-import { jsonError, requireBusinessContext } from '@/server/common/http';
+import { jsonError, requireBusinessContext, requireBusinessReadContext } from '@/server/common/http';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -11,7 +11,7 @@ interface RouteContext {
 // Another business's document id is a 404 (the service scopes by businessId), never a 403.
 export async function GET(_request: Request, { params }: RouteContext) {
   try {
-    const { businessId } = await requireBusinessContext();
+    const { businessId } = await requireBusinessReadContext();
     const { id } = await params;
     return NextResponse.json(await documentsService.get(businessId, id));
   } catch (err) {

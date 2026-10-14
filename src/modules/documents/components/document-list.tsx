@@ -109,7 +109,13 @@ function FilterSelect<T extends string>({
   );
 }
 
-export function DocumentList({ initialSubmissionStatus }: { initialSubmissionStatus?: SubmissionStatus }) {
+export function DocumentList({
+  initialSubmissionStatus,
+  readOnly = false,
+}: {
+  initialSubmissionStatus?: SubmissionStatus;
+  readOnly?: boolean;
+}) {
   const [tab, setTab] = useState<'ALL' | DocumentKind>('ALL');
   const [status, setStatus] = useState<DocumentStatus>();
   const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus | undefined>(initialSubmissionStatus);
@@ -133,22 +139,24 @@ export function DocumentList({ initialSubmissionStatus }: { initialSubmissionSta
           <h1 className="text-2xl font-semibold tracking-tight">Invoices</h1>
           <p className="text-muted-foreground">Invoices, credit notes and debit notes.</p>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button>
-              <IconPlus />
-              New
-              <IconChevronDown />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {(['INVOICE', 'CREDIT_NOTE', 'DEBIT_NOTE'] as const).map((kind) => (
-              <DropdownMenuItem key={kind} asChild>
-                <Link href={`/app/invoices/new?kind=${kind}`}>{DOCUMENT_KIND_LABELS[kind]}</Link>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {readOnly ? null : (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button>
+                <IconPlus />
+                New
+                <IconChevronDown />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {(['INVOICE', 'CREDIT_NOTE', 'DEBIT_NOTE'] as const).map((kind) => (
+                <DropdownMenuItem key={kind} asChild>
+                  <Link href={`/app/invoices/new?kind=${kind}`}>{DOCUMENT_KIND_LABELS[kind]}</Link>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {noneYet ? (
@@ -158,9 +166,11 @@ export function DocumentList({ initialSubmissionStatus }: { initialSubmissionSta
           <p className="max-w-sm text-sm text-pretty text-muted-foreground">
             Start with a draft. Drafts can be edited freely until they are issued to ZATCA.
           </p>
-          <Button asChild variant="outline" className="mt-2">
-            <Link href="/app/invoices/new?kind=INVOICE">Create your first invoice</Link>
-          </Button>
+          {readOnly ? null : (
+            <Button asChild variant="outline" className="mt-2">
+              <Link href="/app/invoices/new?kind=INVOICE">Create your first invoice</Link>
+            </Button>
+          )}
         </div>
       ) : (
         <>

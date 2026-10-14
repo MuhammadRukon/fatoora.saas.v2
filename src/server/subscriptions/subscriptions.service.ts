@@ -68,6 +68,12 @@ export const subscriptionsService = {
     if (state !== 'ACTIVE') throw new SubscriptionRequiredError();
   },
 
+  /** Read-only access to issued records: ACTIVE, or EXPIRED (had a plan once, none now). */
+  async assertReadable(userId: string, now = new Date()): Promise<void> {
+    const { state } = await subscriptionsService.getState(userId, now);
+    if (state !== 'ACTIVE' && state !== 'EXPIRED') throw new SubscriptionRequiredError();
+  },
+
   /** Admin overview: USER accounts, open requests, users with a current active period. */
   async counts(now = new Date()) {
     const [users, pending, active] = await Promise.all([
