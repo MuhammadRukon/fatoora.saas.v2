@@ -30,6 +30,7 @@ export function Picker({
   disabled,
   invalid,
   onSearch,
+  onOpenChange,
   onSelect,
   onClear,
   clearLabel,
@@ -45,6 +46,7 @@ export function Picker({
   disabled?: boolean;
   invalid?: boolean;
   onSearch: (q: string) => void;
+  onOpenChange?: (open: boolean) => void;
   onSelect: (option: PickerOption) => void;
   onClear?: () => void;
   clearLabel?: string;
@@ -59,7 +61,13 @@ export function Picker({
   const label = options.find((o) => o.id === value)?.label ?? selectedLabel;
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        onOpenChange?.(o);
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           id={id}

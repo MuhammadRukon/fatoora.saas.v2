@@ -40,7 +40,7 @@ export function useSaveDocument(id?: string) {
         : apiFetch<DocumentDTO>('/api/app/documents', { method: 'POST', body: input }),
     onSuccess: (doc) => {
       qc.setQueryData(queryKeys.documents.detail(doc.id), doc);
-      void qc.invalidateQueries({ queryKey: queryKeys.documents.all });
+      void qc.invalidateQueries({ queryKey: queryKeys.documents.lists }); // the detail was just set
       toast.success(id ? 'Draft saved' : 'Draft created');
     },
     onError: errorToast('Could not save the draft'),
@@ -53,7 +53,7 @@ export function useDeleteDocument(id: string) {
     mutationFn: () => apiFetch<null>(`/api/app/documents/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     onSuccess: () => {
       qc.removeQueries({ queryKey: queryKeys.documents.detail(id) });
-      void qc.invalidateQueries({ queryKey: queryKeys.documents.all });
+      void qc.invalidateQueries({ queryKey: queryKeys.documents.lists }); // the detail was just set
       toast.success('Draft deleted');
     },
     onError: errorToast('Could not delete the draft'),
@@ -66,7 +66,7 @@ export function useDuplicateDocument(id: string) {
     mutationFn: () => apiFetch<DocumentDTO>(`/api/app/documents/${encodeURIComponent(id)}/duplicate`, { method: 'POST' }),
     onSuccess: (doc) => {
       qc.setQueryData(queryKeys.documents.detail(doc.id), doc);
-      void qc.invalidateQueries({ queryKey: queryKeys.documents.all });
+      void qc.invalidateQueries({ queryKey: queryKeys.documents.lists }); // the detail was just set
       toast.success('Copied to a new draft');
     },
     onError: errorToast('Could not duplicate the document'),
@@ -86,7 +86,7 @@ function useDocumentAction(id: string, action: 'issue' | 'retry', failure: strin
     mutationFn: () => apiFetch<DocumentDTO>(`/api/app/documents/${encodeURIComponent(id)}/${action}`, { method: 'POST' }),
     onSuccess: (doc) => {
       qc.setQueryData(queryKeys.documents.detail(doc.id), doc);
-      void qc.invalidateQueries({ queryKey: queryKeys.documents.all });
+      void qc.invalidateQueries({ queryKey: queryKeys.documents.lists }); // the detail was just set
       verdictToast(doc);
     },
     onError: errorToast(failure),

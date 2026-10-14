@@ -9,11 +9,13 @@ export const queryKeys = {
   zatca: ['zatca', 'status'] as const,
   customers: {
     all: ['customers'] as const,
+    lists: ['customers', 'list'] as const,
     list: (q: string) => ['customers', 'list', q] as const,
     detail: (id: string) => ['customers', 'detail', id] as const,
   },
   documents: {
     all: ['documents'] as const,
+    lists: ['documents', 'list'] as const,
     list: (filters: object) => ['documents', 'list', filters] as const,
     detail: (id: string) => ['documents', 'detail', id] as const,
   },

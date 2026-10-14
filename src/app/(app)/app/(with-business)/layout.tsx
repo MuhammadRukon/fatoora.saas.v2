@@ -1,14 +1,14 @@
 import { redirect } from 'next/navigation';
 
-import { auth } from '@/auth';
-import { resolveBusinessId } from '@/server/business/business-context';
+import { getSession } from '@/lib/session';
+import { cachedBusinessId } from '@/server/business/cached';
 import { BusinessRequiredError } from '@/server/common/errors';
 
 /** Every /app page except /app/business needs a business profile first. */
 export default async function RequireBusinessLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user) redirect('/login');
-  const hasBusiness = await resolveBusinessId(session.user.id).then(
+  const hasBusiness = await cachedBusinessId(session.user.id).then(
     () => true,
     (err) => {
       if (err instanceof BusinessRequiredError) return false;

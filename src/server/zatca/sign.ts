@@ -64,6 +64,7 @@ export function signedPropertiesDigest(xmlOrElement: string): string {
 
 /** The ext:UBLExtensions element, byte-identical in layout to the ZATCA SDK sample. */
 export function signatureBlock(v: BlockValues): string {
+  const signedProperties = signedPropertiesXml(v);
   return `<ext:UBLExtensions>
     <ext:UBLExtension>
         <ext:ExtensionURI>urn:oasis:names:specification:ubl:dsig:enveloped:xades</ext:ExtensionURI>
@@ -94,7 +95,7 @@ export function signatureBlock(v: BlockValues): string {
                             </ds:Reference>
                             <ds:Reference Type="http://www.w3.org/2000/09/xmldsig#SignatureProperties" URI="#xadesSignedProperties">
                                 <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
-                                <ds:DigestValue>${signedPropertiesDigest(signedPropertiesXml(v))}</ds:DigestValue>
+                                <ds:DigestValue>${signedPropertiesDigest(signedProperties)}</ds:DigestValue>
                             </ds:Reference>
                         </ds:SignedInfo>
                         <ds:SignatureValue>${v.signatureValue}</ds:SignatureValue>
@@ -105,7 +106,7 @@ export function signatureBlock(v: BlockValues): string {
                         </ds:KeyInfo>
                         <ds:Object>
                             <xades:QualifyingProperties xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" Target="signature">
-                                ${signedPropertiesXml(v)}
+                                ${signedProperties}
                             </xades:QualifyingProperties>
                         </ds:Object>
                     </ds:Signature>
