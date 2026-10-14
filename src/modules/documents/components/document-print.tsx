@@ -2,8 +2,9 @@ import type { ReactNode } from 'react';
 
 import type { DocumentDTO, PartySnapshot } from '@/contracts/documents';
 import { VATEX_REASONS } from '@/server/zatca/codes';
+import { riyadhDisplay } from '@/server/zatca/time';
 
-import { formatAmount } from '../format';
+import { formatAmount, printState } from '../format';
 import { PrintButton } from './print-button';
 
 const TITLES: Record<string, [string, string]> = {
@@ -85,12 +86,16 @@ const th = 'border border-neutral-300 bg-neutral-100 px-1.5 py-1 text-start text
 const td = 'border border-neutral-300 px-1.5 py-1 align-top tabular-nums';
 
 /** Arabic-primary (RTL), English-secondary print layout of a document. */
-export function DocumentPrint({ doc, backHref }: { doc: DocumentDTO; backHref: string }) {
+export function DocumentPrint({ doc, backHref, qrDataUrl }: { doc: DocumentDTO; backHref: string; qrDataUrl?: string | null }) {
   const [titleAr, titleEn] = titleFor(doc);
   const isDraft = doc.status === 'DRAFT';
+  const print = printState(doc);
   const meta: [ReactNode, ReactNode][] = [
     [<Bi key="n" ar="رقم المستند" en="Number" />, isDraft ? <Bi key="v" ar="مسودة" en="Draft" /> : doc.number],
-    [<Bi key="d" ar="تاريخ الإصدار" en="Issue date" />, doc.issueDate ?? '-'],
+    doc.issuedAt
+      ? [<Bi key="d" ar="تاريخ ووقت الإصدار" en="Issued (Riyadh time)" />, <span key="dv" dir="ltr">{riyadhDisplay(new Date(doc.issuedAt))}</span>]
+      : [<Bi key="d" ar="تاريخ الإصدار" en="Issue date" />, doc.issueDate ?? '-'],
+    ...(doc.uuid ? ([[<Bi key="u" ar="المعرّف الفريد" en="UUID" />, <span key="uv" dir="ltr" className="text-[0.7rem]">{doc.uuid}</span>]] as [ReactNode, ReactNode][]) : []),
     ...(doc.supplyDate
       ? ([[<Bi key="s" ar="تاريخ التوريد" en="Supply date" />, doc.supplyEndDate ? `${doc.supplyDate} → ${doc.supplyEndDate}` : doc.supplyDate]] as [ReactNode, ReactNode][])
       : []),
@@ -118,8 +123,16 @@ export function DocumentPrint({ doc, backHref }: { doc: DocumentDTO; backHref: s
         <a href={backHref} className="text-sm underline-offset-4 hover:underline">
           Back to document
         </a>
-        <PrintButton />
+        <PrintButton disabled={!print.allowed} />
       </div>
+      {!print.allowed ? (
+        <div role="status" dir="ltr" className="mx-auto my-12 max-w-md border bg-background p-6 text-center">
+          <p className="font-medium">{print.reason}</p>
+          <p className="mt-1 text-sm text-neutral-600">
+            This document can be printed once ZATCA has cleared it. Check its status on the document page.
+          </p>
+        </div>
+      ) : (
 
       <article
         dir="rtl"
@@ -128,6 +141,16 @@ export function DocumentPrint({ doc, backHref }: { doc: DocumentDTO; backHref: s
         className="print-root relative mx-auto my-6 flex min-h-[297mm] w-[210mm] max-w-full flex-col gap-4 overflow-hidden bg-white p-[10mm] text-sm text-black shadow-lg"
         style={{ fontFamily: "'Segoe UI', Tahoma, 'Noto Naskh Arabic', Arial, sans-serif" }}
       >
+        {doc.isTest && !isDraft ? (
+          <div
+            aria-hidden
+            data-watermark="simulation"
+            className="pointer-events-none absolute inset-0 flex items-center justify-center text-[3.2rem] font-bold tracking-wide whitespace-nowrap text-neutral-900/10 select-none"
+            style={{ transform: 'rotate(-30deg)' }}
+          >
+            SIMULATION – ليست فاتورة ضريبية
+          </div>
+        ) : null}
         {isDraft ? (
           <div
             aria-hidden
@@ -308,19 +331,20 @@ export function DocumentPrint({ doc, backHref }: { doc: DocumentDTO; backHref: s
           <p>
             {doc.seller.nameAr ?? doc.seller.name} · <Bi ar="الرقم الضريبي" en="VAT No." /> <span className="tabular-nums">{doc.seller.vatNumber}</span>
           </p>
-          {/* QR slot: Phase 7 renders the signed TLV QR here for issued documents. */}
           <div
             data-qr-slot
-            className="flex size-[32mm] shrink-0 items-center justify-center border border-dashed border-neutral-400 p-1 text-center text-[0.65rem] leading-tight"
+            className="flex size-[32mm] shrink-0 items-center justify-center border border-neutral-400 p-1 text-center text-[0.65rem] leading-tight"
           >
-            {isDraft ? (
-              <Bi ar="يظهر رمز الاستجابة السريعة بعد الإصدار" en="QR code appears after issue" block />
+            {qrDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={qrDataUrl} alt="رمز الاستجابة السريعة / ZATCA QR code" className="size-full" />
             ) : (
-              <Bi ar="رمز الاستجابة السريعة" en="QR code" block />
+              <Bi ar="يظهر رمز الاستجابة السريعة بعد الإصدار" en="QR code appears after issue" block />
             )}
           </div>
         </footer>
       </article>
+      )}
     </div>
   );
 }

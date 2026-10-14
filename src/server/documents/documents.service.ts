@@ -236,6 +236,19 @@ export const documentsService = {
     return toDTO(row);
   },
 
+  /** Simplified documents still unreported after 18h: the 24h reporting deadline is close (plan AC7.13). */
+  countUnreportedSimplified(businessId: string, now: Date = new Date()) {
+    return prisma.document.count({
+      where: {
+        businessId,
+        subtype: 'SIMPLIFIED',
+        status: 'ISSUED',
+        submissionStatus: 'PENDING_RETRY',
+        issuedAt: { lt: new Date(now.getTime() - 18 * 3600_000) },
+      },
+    });
+  },
+
   /** The legal XML of an ISSUED document: ZATCA's cleared copy when there is one, else our signed copy. */
   async getXml(businessId: string, id: string) {
     const d = await prisma.document.findFirst({

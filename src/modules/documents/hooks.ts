@@ -79,3 +79,26 @@ export function useDuplicateDocument(id: string) {
     onError: errorToast('Could not duplicate the document'),
   });
 }
+
+const verdictToast = (doc: DocumentDTO) => {
+  if (doc.submissionStatus === 'REJECTED') toast.error(`${doc.number} was rejected by ZATCA`);
+  else if (doc.submissionStatus === 'PENDING_RETRY') toast.warning(`${doc.number} is issued but not yet reported to ZATCA`);
+  else toast.success(`${doc.number} ${doc.submissionStatus === 'CLEARED' ? 'cleared' : 'reported'}`);
+};
+
+/** Issue then submit: HTTP 200 carries ZATCA's verdict in `submissionStatus`, even for a rejection. */
+function useDocumentAction(id: string, action: 'issue' | 'retry', failure: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiFetch<DocumentDTO>(`/api/app/documents/${encodeURIComponent(id)}/${action}`, { method: 'POST' }),
+    onSuccess: (doc) => {
+      qc.setQueryData(queryKeys.documents.detail(doc.id), doc);
+      void qc.invalidateQueries({ queryKey: queryKeys.documents.all });
+      verdictToast(doc);
+    },
+    onError: errorToast(failure),
+  });
+}
+
+export const useIssueDocument = (id: string) => useDocumentAction(id, 'issue', 'Could not issue the document');
+export const useRetryDocument = (id: string) => useDocumentAction(id, 'retry', 'Could not resubmit the document');

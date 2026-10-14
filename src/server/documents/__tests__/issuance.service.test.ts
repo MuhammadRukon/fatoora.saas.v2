@@ -207,4 +207,15 @@ describe('issuance.issueAndSubmit', () => {
     await issuanceService.retry(business.id, d.id, deps(gw.fetchImpl));
     expect(gw.calls).toHaveLength(0);
   });
+
+  it('AC7.13: the overdue count includes simplified PENDING_RETRY documents older than 18h only', async () => {
+    const { business } = await setupIssuing(users);
+    const d = await createDraft(business.id);
+    await issuanceService.issueAndSubmit(business.id, d.id, deps(mockGateway({ report: { status: -1 } }).fetchImpl));
+    const issuedAt = NOW.getTime();
+    expect(await documentsService.countUnreportedSimplified(business.id, new Date(issuedAt + 17 * 3600_000))).toBe(0);
+    expect(await documentsService.countUnreportedSimplified(business.id, new Date(issuedAt + 19 * 3600_000))).toBe(1);
+    await issuanceService.retry(business.id, d.id, deps(mockGateway().fetchImpl));
+    expect(await documentsService.countUnreportedSimplified(business.id, new Date(issuedAt + 19 * 3600_000))).toBe(0);
+  });
 });

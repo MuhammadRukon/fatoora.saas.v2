@@ -109,10 +109,10 @@ function FilterSelect<T extends string>({
   );
 }
 
-export function DocumentList() {
+export function DocumentList({ initialSubmissionStatus }: { initialSubmissionStatus?: SubmissionStatus }) {
   const [tab, setTab] = useState<'ALL' | DocumentKind>('ALL');
   const [status, setStatus] = useState<DocumentStatus>();
-  const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>();
+  const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus | undefined>(initialSubmissionStatus);
   const [search, setSearch] = useState('');
   const [q, setQ] = useState('');
   useEffect(() => {
