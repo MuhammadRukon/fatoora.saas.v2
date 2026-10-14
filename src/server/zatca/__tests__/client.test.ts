@@ -57,7 +57,7 @@ describe('zatca client outcomes (AC6.2)', () => {
 describe('zatca client requests (AC6.2)', () => {
   const call = async (
     fn: (c: ReturnType<typeof createZatcaClient>) => Promise<unknown>,
-    env: 'SIMULATION' | 'PRODUCTION' = 'SIMULATION',
+    env: 'SIMULATION' | 'PRODUCTION' | 'SANDBOX' = 'SIMULATION',
   ) => {
     const f = reply(200);
     await fn(createZatcaClient(env, f));
@@ -77,6 +77,11 @@ describe('zatca client requests (AC6.2)', () => {
       'Content-Type': 'application/json',
     });
     expect(headers.Authorization).toBeUndefined();
+  });
+
+  it('dev-only SANDBOX targets the developer-portal base path', async () => {
+    const { url } = await call((c) => c.requestComplianceCsid('123345', 'CSRB64'), 'SANDBOX');
+    expect(url).toBe('https://gw-fatoora.zatca.gov.sa/e-invoicing/developer-portal/compliance');
   });
 
   it('authenticated calls send Basic base64(token:secret) and no OTP; PRODUCTION uses core', async () => {

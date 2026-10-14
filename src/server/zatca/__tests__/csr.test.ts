@@ -35,6 +35,7 @@ describe('buildCsr (AC5.5)', () => {
   it.each([
     ['SIMULATION', 'PREZATCA-Code-Signing'],
     ['PRODUCTION', 'ZATCA-Code-Signing'],
+    ['SANDBOX', 'TSTZATCA-Code-Signing'],
   ] as const)('%s CSR carries the %s template, the SAN dirName and a valid self-signature', (env, template) => {
     const { csr } = parse(buildCsr({ ...keys, ...input, env }));
 

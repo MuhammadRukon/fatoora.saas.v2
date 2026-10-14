@@ -52,3 +52,26 @@ Prerequisite: the EGS is onboarded in Simulation (AC6.5). Needs a real Simulatio
 Cron check (optional): `curl -H "Authorization: Bearer $CRON_SECRET" https://<app>/api/cron/zatca-retry` returns `{"processed": n}`; without the header it returns 401.
 
 Assumptions the Simulation run must confirm: the clearance response carries `clearedInvoice` (base64 XML) and the cleared XML contains the QR as `cbc:EmbeddedDocumentBinaryObject` under `AdditionalDocumentReference` `QR`; a 200 on clearance means CLEARED; a 202 means accepted with warnings; the seller registration name (Arabic) and a buyer name taken from `name`.
+
+## Sandbox findings (`npm run zatca:sandbox-check`, dev-only)
+
+The developer-portal sandbox (`/e-invoicing/developer-portal`, not a product environment) needs no taxpayer credentials: CSR template `TSTZATCA-Code-Signing`, any well-formed VAT (15 digits, starts and ends with 3), OTP `123345` (accepted, verified 2026-10-14). The script (`scripts/zatca-sim-check.ts --sandbox`, no DB) uses the synthetic taxpayer VAT 399999999900003, writes recordings to `tools/zatca-sim-recordings/sandbox-<ts>/` and exits non-zero on any error or warning. `createZatcaClient('SANDBOX')` and `buildCsr({env: 'SANDBOX'})` exist only for it (`ZatcaDevEnvironment`).
+
+Result (2026-10-14): all 6 compliance documents PASS, 0 errors, 0 warnings, only the info `XSD_ZATCA_VALID`. No library fix was needed.
+
+Sandbox is a real validator, not a stub. Mutations of a valid simplified invoice were rejected (HTTP 400):
+- wrong `invoiceHash` in the body: `invalid-invoice-hash` + `invoiceHash_QRCODE_INVALID`
+- altered signature value: `INVOICE_SIGNATURE_VALUE_QRCODE_INVALID`
+- altered QR (tag 1): `sellerName_QRCODE_INVALID`; QR removed: `BR-KSA-27` (warning) + `BR-KSA-28/30`, `QRCODE_INVALID`
+- edited amount: `BR-CO-16` (warning) + `invalid-invoice-hash`; removed ProfileID: `BR-KSA-EN16931-01`
+- non-ZATCA XML: HTTP 400 body `{"raw":"Invalid Request"}` (not JSON)
+
+Not checked by the sandbox: ICV/PIH chain, invoice storage (resubmitting the same document is accepted again, so DUPLICATE can not be provoked), real certificate chain.
+
+Response shapes (field names and types as seen; `secret` blanked in recordings):
+- `POST /compliance` 200: `{requestID: number, dispositionMessage: "ISSUED", binarySecurityToken: string, secret: string, errors: null}`. `requestID` is a JSON number (the parser's `field()` stringifies numbers).
+- `POST /compliance/invoices` 200: `{validationResults: {infoMessages[], warningMessages[], errorMessages[], status}, reportingStatus: null, clearanceStatus: "CLEARED", qrSellertStatus: null, qrBuyertStatus: null}` (the sandbox answers "CLEARED" for a simplified invoice too, and "REPORTED" when it is simplified and reporting; trust HTTP status + `validationResults`). Each message: `{type, code, category, message, status}`.
+- `POST /production/csids` 200: `{requestID: number, tokenType, dispositionMessage: "ISSUED", binarySecurityToken, secret}`. Works with the compliance token in the sandbox.
+- `POST /invoices/reporting/single` 200: `{validationResults, reportingStatus: "REPORTED"}`.
+- `POST /invoices/clearance/single` 200: `{validationResults, clearanceStatus: "CLEARED", clearedInvoice: <base64 XML>}`. `extractQrFromXml` reads the QR from `clearedInvoice` (tags 1-9 present); ZATCA writes `mimeCode="text/plain"` on `EmbeddedDocumentBinaryObject`.
+- Documents signed by the compliance certificate were accepted by reporting and clearance with the production CSID (the sandbox does not check the chain).

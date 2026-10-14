@@ -6,7 +6,7 @@ export type { ZatcaAddress, ZatcaDocumentInput, ZatcaLineInput, ZatcaParty, Zatc
 export { computeInvoiceHash, PIH_SEED } from './hash';
 export { signInvoice, verifySignedInvoice, SIGNATURE_INPUT } from './sign';
 export { buildQrTlv, extractQrFromXml, parseQrTlv, ZatcaQrError, type QrFields } from './qr';
-export { buildCsr, generateKeyPair, type CsrInput, type ZatcaEnvironment } from './csr';
+export { buildCsr, generateKeyPair, type CsrInput, type ZatcaDevEnvironment, type ZatcaEnvironment } from './csr';
 export { certificateFromToken, certificateInfo } from './certificate';
 export * from './crypto-box';
 export * from './client';
