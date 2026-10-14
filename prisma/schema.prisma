@@ -352,6 +352,8 @@ model Document {
   lines                 DocumentLine[]
 
   @@unique([businessId, kind, sequence])
+  /// One ICV per EGS chain (NULLs allowed for drafts). The partial index on PENDING_RETRY documents lives in the migration SQL only.
+  @@unique([egsUnitId, icv])
   @@index([businessId, createdAt])
   @@index([customerId])
   @@index([billingReferenceId])

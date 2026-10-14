@@ -139,3 +139,16 @@ describe('retryPending time budget (finding 5)', () => {
     expect((await row(d.id)).submissionStatus).toBe('PENDING_RETRY');
   });
 });
+
+describe('chain integrity constraint (finding 12)', () => {
+  it('the database refuses two documents with the same ICV on one EGS', async () => {
+    const { business, egs } = await setupIssuing(users);
+    const d = await createDraft(business.id);
+    await issuanceService.issue(business.id, d.id, deps(mockGateway().fetchImpl));
+    const dup = await createDraft(business.id);
+    const err = await prisma.document.update({ where: { id: dup.id }, data: { egsUnitId: egs!.id, icv: 1 } }).then(() => null, (e) => e);
+    expect(err?.code).toBe('P2002');
+    // Drafts (NULL icv) never collide.
+    await createDraft(business.id);
+  });
+});
