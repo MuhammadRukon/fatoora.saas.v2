@@ -12,6 +12,7 @@ Fast orientation for AI assistants and human contributors. Read `01-overview.md`
 | [04-api-reference.md](./04-api-reference.md) | Every API route, its auth level, and what it does |
 | [05-frontend.md](./05-frontend.md) | Page inventory, module structure, state management |
 | [06-conventions.md](./06-conventions.md) | How to add a feature, contracts-first workflow, query keys, testing, git flow |
+| [07-zatca-onboarding.md](./07-zatca-onboarding.md) | EGS onboarding flow, encrypted credentials, and how to run the Simulation gate (`npm run zatca:sim-check`) |
 
 ## Other docs
 

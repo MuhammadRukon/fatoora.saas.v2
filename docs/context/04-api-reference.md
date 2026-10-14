@@ -28,6 +28,8 @@ Signup, email verification (verify code, resend), forgot/reset and change-passwo
 | `/api/app/business` | GET, PUT | app | GET returns the profile or `null`; PUT creates the first time, then updates; 422 on field errors; 409 `BUSINESS_LOCKED_FIELDS` |
 | `/api/app/customers` | GET, POST | app + business | GET `?q=&cursor=&limit=` cursor page; POST 201; 409 `BUSINESS_REQUIRED` before a business exists |
 | `/api/app/customers/[id]` | GET, PATCH, DELETE | app + business | another business's id is 404; DELETE 204; 409 `CUSTOMER_HAS_DOCUMENTS` once documents reference it |
+| `/api/app/zatca` | GET | app + business | `{environment, egs: {status, serialNumber, certNotAfter, lastError} \| null}`; never keys, tokens or secrets |
+| `/api/app/zatca/onboard` | POST | app + business | body `{otp: "123456"}` (422 otherwise); 429 after 5 attempts per hour per business; 409 if the EGS is already ACTIVE; 200 `{status, errors, results[]}` even when ZATCA rejected (`status: FAILED`, `errors` has ZATCA's text) |
 
 ## Admin
 
