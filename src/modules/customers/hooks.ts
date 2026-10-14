@@ -1,27 +1,22 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { apiFetch, ApiClientError } from '@/lib/fetcher';
+import { apiFetch, ApiClientError, errorToast } from '@/lib/fetcher';
 import { queryKeys } from '@/constants/queryKeys';
 import type { CustomerData, CustomerDTO } from '@/contracts/customers';
+import type { CursorPage } from '@/server/common/pagination';
 
-interface CustomerPage {
-  items: CustomerDTO[];
-  nextCursor: string | null;
-}
 
-const errorToast = (fallback: string) => (err: unknown) =>
-  toast.error(err instanceof ApiClientError ? err.message : fallback);
-
-export function useCustomers(q: string) {
+export function useCustomers(q: string, enabled = true) {
   return useInfiniteQuery({
+    enabled,
     queryKey: queryKeys.customers.list(q),
     initialPageParam: '',
     queryFn: ({ pageParam }) => {
       const params = new URLSearchParams({ limit: '50' });
       if (q) params.set('q', q);
       if (pageParam) params.set('cursor', pageParam);
-      return apiFetch<CustomerPage>(`/api/app/customers?${params}`);
+      return apiFetch<CursorPage<CustomerDTO>>(`/api/app/customers?${params}`);
     },
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
@@ -45,7 +40,7 @@ export function useSaveCustomer(id?: string) {
         : apiFetch<CustomerDTO>('/api/app/customers', { method: 'POST', body: input }),
     onSuccess: (customer) => {
       qc.setQueryData(queryKeys.customers.detail(customer.id), customer);
-      void qc.invalidateQueries({ queryKey: queryKeys.customers.all, exact: false });
+      void qc.invalidateQueries({ queryKey: queryKeys.customers.lists }); // the detail was just set
       toast.success(id ? 'Customer saved' : 'Customer added');
     },
     onError: errorToast('Could not save the customer'),
@@ -58,7 +53,7 @@ export function useDeleteCustomer(id: string) {
     mutationFn: () => apiFetch<null>(`/api/app/customers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     onSuccess: () => {
       qc.removeQueries({ queryKey: queryKeys.customers.detail(id) });
-      void qc.invalidateQueries({ queryKey: queryKeys.customers.all });
+      void qc.invalidateQueries({ queryKey: queryKeys.customers.lists });
       toast.success('Customer deleted');
     },
     onError: errorToast('Could not delete the customer'),

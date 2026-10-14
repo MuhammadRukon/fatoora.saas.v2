@@ -3,8 +3,7 @@ import { z } from 'zod';
 
 import { VATEX_REASONS } from '@/server/zatca/codes';
 
-import { nullable, optionalArabic, text } from './business';
-import { paginationQuerySchema } from './common';
+import { nullable, optionalArabic, paginationQuerySchema, text } from './common';
 
 export const MAX_LINES = 500;
 

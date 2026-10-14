@@ -13,7 +13,7 @@ import {
   signupSchema,
   verifyEmailSchema,
 } from '@/contracts/auth';
-import { AppError, toJsonError } from '@/server/common/errors';
+import { AppError, errMsg, toJsonError } from '@/server/common/errors';
 import { requireSession } from '@/server/common/http';
 import { log } from '@/server/common/logger';
 import { RateLimitedError, clearRateLimit, enforceRateLimit, ipFromHeaders } from '@/server/common/rate-limit';
@@ -60,7 +60,7 @@ export async function signupAction(input: unknown): Promise<ActionResult> {
       return { ok: false, message: err.message };
     }
     log.error('auth.signup.action.failed', {
-      error: err instanceof Error ? err.message : String(err),
+      error: errMsg(err),
     });
     return { ok: false, message: toJsonError(err).message };
   }
@@ -88,7 +88,7 @@ export async function forgotPasswordAction(input: unknown): Promise<ActionResult
       return { ok: false, message: 'Too many requests. Try again in a few minutes.' };
     }
     log.error('auth.forgot.action.failed', {
-      error: err instanceof Error ? err.message : String(err),
+      error: errMsg(err),
     });
     return { ok: false, message: 'Could not process request' };
   }
@@ -111,7 +111,7 @@ export async function resetPasswordAction(input: unknown): Promise<ActionResult>
       return { ok: false, message: err.message };
     }
     log.error('auth.reset.action.failed', {
-      error: err instanceof Error ? err.message : String(err),
+      error: errMsg(err),
     });
     return { ok: false, message: toJsonError(err).message };
   }
@@ -145,7 +145,7 @@ export async function verifyEmailAction(input: unknown): Promise<ActionResult> {
       return { ok: false, message: err.message };
     }
     log.error('auth.verify.action.failed', {
-      error: err instanceof Error ? err.message : String(err),
+      error: errMsg(err),
     });
     return { ok: false, message: toJsonError(err).message };
   }
@@ -173,7 +173,7 @@ export async function resendVerificationAction(input: unknown): Promise<ActionRe
       return { ok: false, message: 'Too many resend requests. Try again in a few minutes.' };
     }
     log.error('auth.resendVerification.action.failed', {
-      error: err instanceof Error ? err.message : String(err),
+      error: errMsg(err),
     });
     return { ok: false, message: 'Could not process request' };
   }
@@ -206,7 +206,7 @@ export async function changePasswordAction(input: unknown): Promise<ActionResult
       return { ok: false, message: err.message };
     }
     log.error('auth.changePassword.action.failed', {
-      error: err instanceof Error ? err.message : String(err),
+      error: errMsg(err),
     });
     return { ok: false, message: toJsonError(err).message };
   }

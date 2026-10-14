@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { IconAlertTriangle, IconBuildingStore, IconChevronRight, IconUsers } from '@tabler/icons-react';
 
-import { auth } from '@/auth';
+import { getSession } from '@/lib/session';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ZATCA_ENVIRONMENT_LABELS } from '@/contracts/business';
+import { cachedBusinessId } from '@/server/business/cached';
 import { businessService } from '@/server/business/business.service';
 import { documentsService } from '@/server/documents/documents.service';
 
@@ -13,9 +14,14 @@ const LINKS = [
 ];
 
 export default async function AppHome() {
-  const session = await auth();
-  const business = session?.user ? await businessService.getMine(session.user.id) : null;
-  const overdue = business ? await documentsService.countUnreportedSimplified(business.id) : 0;
+  const session = await getSession();
+  const userId = session?.user?.id;
+  // The layout already resolved (and cached) the business id; if it has no business it is redirecting anyway.
+  const businessId = userId ? await cachedBusinessId(userId).catch(() => null) : null;
+  const [business, overdue] = await Promise.all([
+    userId ? businessService.getMine(userId) : null,
+    businessId ? documentsService.countUnreportedSimplified(businessId) : 0,
+  ]);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8">

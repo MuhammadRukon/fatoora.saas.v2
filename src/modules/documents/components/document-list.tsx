@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { ColumnDef } from '@tanstack/react-table';
 import { IconAlertCircle, IconChevronDown, IconFileInvoice, IconPlus, IconSearch } from '@tabler/icons-react';
@@ -22,6 +22,7 @@ import {
   SUBMISSION_STATUS_LABELS,
   type DocumentListItemDTO,
 } from '@/contracts/documents';
+import { useDebouncedValue } from '@/lib/use-debounced-value';
 
 import { formatAmount } from '../format';
 import { useDocuments } from '../hooks';
@@ -120,11 +121,7 @@ export function DocumentList({
   const [status, setStatus] = useState<DocumentStatus>();
   const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus | undefined>(initialSubmissionStatus);
   const [search, setSearch] = useState('');
-  const [q, setQ] = useState('');
-  useEffect(() => {
-    const t = setTimeout(() => setQ(search.trim()), 250);
-    return () => clearTimeout(t);
-  }, [search]);
+  const q = useDebouncedValue(search.trim());
 
   const filters = { kind: tab === 'ALL' ? undefined : tab, status, submissionStatus, q: q || undefined };
   const { data, isLoading, isError, hasNextPage, fetchNextPage, isFetchingNextPage } = useDocuments(filters);

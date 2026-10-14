@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 
 import { auth } from '@/auth';
-import { ForbiddenError, UnauthorizedError, statusFromError, toJsonError } from './errors';
+import { ForbiddenError, UnauthorizedError, errMsg, statusFromError, toJsonError } from './errors';
 import { resolveBusinessId } from '@/server/business/business-context';
 import { subscriptionsService } from '@/server/subscriptions/subscriptions.service';
 import { log } from './logger';
@@ -56,24 +56,20 @@ export async function requireAppSession(): Promise<{ userId: string }> {
   return { userId: user.id };
 }
 
-/** Gate for GET-only routes over already-issued records: also lets an EXPIRED subscription read. */
-export async function requireAppReadSession(): Promise<{ userId: string }> {
+/** The subscription check and the business lookup run together; the subscription error (402) wins over BUSINESS_REQUIRED (409). */
+async function gatedBusinessContext(check: (userId: string) => Promise<unknown>) {
   const user = await requireUserSession();
-  await subscriptionsService.assertReadable(user.id);
-  return { userId: user.id };
+  const [gate, business] = await Promise.allSettled([check(user.id), resolveBusinessId(user.id)]);
+  if (gate.status === 'rejected') throw gate.reason;
+  if (business.status === 'rejected') throw business.reason;
+  return { userId: user.id, businessId: business.value };
 }
 
-/** requireAppReadSession + the business the request is scoped to. */
-export async function requireBusinessReadContext(): Promise<{ userId: string; businessId: string }> {
-  const { userId } = await requireAppReadSession();
-  return { userId, businessId: await resolveBusinessId(userId) };
-}
+/** Gate for GET-only routes over already-issued records (also lets an EXPIRED subscription read) + the business. */
+export const requireBusinessReadContext = () => gatedBusinessContext((id) => subscriptionsService.assertReadable(id));
 
 /** requireAppSession + the business the request is scoped to (409 BUSINESS_REQUIRED if none). */
-export async function requireBusinessContext(): Promise<{ userId: string; businessId: string }> {
-  const { userId } = await requireAppSession();
-  return { userId, businessId: await resolveBusinessId(userId) };
-}
+export const requireBusinessContext = () => gatedBusinessContext((id) => subscriptionsService.assertActive(id));
 
 export function jsonError(err: unknown): NextResponse {
   if (err instanceof RateLimitedError) {
@@ -94,7 +90,7 @@ export function jsonError(err: unknown): NextResponse {
   }
   const status = statusFromError(err);
   if (status >= 500) {
-    log.error('http.unhandled', { error: err instanceof Error ? err.message : String(err) });
+    log.error('http.unhandled', { error: errMsg(err) });
   }
   return NextResponse.json(toJsonError(err), { status });
 }

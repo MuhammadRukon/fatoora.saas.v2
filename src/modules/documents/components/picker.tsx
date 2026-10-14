@@ -6,8 +6,9 @@ import { IconCheck, IconSelector } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useDebouncedValue } from '@/lib/use-debounced-value';
 
-export interface PickerOption {
+interface PickerOption {
   id: string;
   label: string;
   detail?: string;
@@ -29,6 +30,7 @@ export function Picker({
   disabled,
   invalid,
   onSearch,
+  onOpenChange,
   onSelect,
   onClear,
   clearLabel,
@@ -44,21 +46,28 @@ export function Picker({
   disabled?: boolean;
   invalid?: boolean;
   onSearch: (q: string) => void;
+  onOpenChange?: (open: boolean) => void;
   onSelect: (option: PickerOption) => void;
   onClear?: () => void;
   clearLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
+  const debouncedQ = useDebouncedValue(q.trim());
   useEffect(() => {
-    const t = setTimeout(() => onSearch(q.trim()), 250);
-    return () => clearTimeout(t);
+    onSearch(debouncedQ);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q]);
+  }, [debouncedQ]);
   const label = options.find((o) => o.id === value)?.label ?? selectedLabel;
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        onOpenChange?.(o);
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           id={id}

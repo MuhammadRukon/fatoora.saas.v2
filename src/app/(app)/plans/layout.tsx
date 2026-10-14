@@ -1,11 +1,11 @@
 import Link from 'next/link';
 
-import { auth } from '@/auth';
+import { getSession } from '@/lib/session';
 import { SignOutButton } from '@/components/common/sign-out-button';
 
 /** Slim shell for /plans (reachable without an active subscription, so no app sidebar). */
 export default async function PlansLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth(); // the (app) group layout already enforced a USER session
+  const session = await getSession(); // the (app) group layout already enforced a USER session
 
   return (
     <div className="flex min-h-svh flex-col">

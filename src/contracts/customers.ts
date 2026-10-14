@@ -1,29 +1,8 @@
 import { BuyerIdScheme, type Customer } from '@prisma/client';
 import { z } from 'zod';
 
-import {
-  ALPHANUMERIC_RE,
-  VAT_NUMBER_MESSAGE,
-  countryCodeSchema,
-  nullable,
-  optionalArabic,
-  text,
-} from './business';
-import { paginationQuerySchema } from './common';
-
-export const BUYER_ID_SCHEME_LABELS: Record<BuyerIdScheme, string> = {
-  TIN: 'Tax identification number',
-  CRN: 'Commercial registration (CRN)',
-  MOM: 'MOMRAH license',
-  MLS: 'MHRSD license',
-  S700: '700 number',
-  SAG: 'MISA license',
-  NAT: 'National ID',
-  GCC: 'GCC ID',
-  IQA: 'Iqama',
-  PAS: 'Passport',
-  OTH: 'Other ID',
-};
+import { VAT_NUMBER_MESSAGE, VAT_NUMBER_RE } from './business';
+import { ALPHANUMERIC_RE, countryCodeSchema, nullable, optionalArabic, paginationQuerySchema, text } from './common';
 
 const optionalText = (max = 200) => nullable(z.string().trim().max(max));
 
@@ -31,7 +10,7 @@ export const customerInputSchema = z
   .object({
     name: text(),
     nameAr: optionalArabic,
-    vatNumber: nullable(z.string().trim().regex(/^(3\d{13}3)?$/, VAT_NUMBER_MESSAGE)),
+    vatNumber: nullable(z.string().trim().refine((v) => !v || VAT_NUMBER_RE.test(v), VAT_NUMBER_MESSAGE)),
     buyerIdScheme: z
       .union([z.enum(BuyerIdScheme), z.literal('')])
       .nullish()

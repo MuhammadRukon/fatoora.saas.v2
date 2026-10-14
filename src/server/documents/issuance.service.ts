@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { Prisma, type EgsUnit } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
 import type { PartySnapshot } from '@/contracts/documents';
 import { env } from '@/env';
 import { prisma } from '@/lib/prisma';
-import { ConflictError, NotFoundError, ValidationError } from '@/server/common/errors';
+import { ConflictError, NotFoundError, ValidationError, errMsg } from '@/server/common/errors';
 import { log } from '@/server/common/logger';
 import {
+  asRecord,
   createZatcaClient,
   decrypt,
   extractQrFromXml,
@@ -19,6 +20,8 @@ import {
   type ZatcaResponse,
 } from '@/server/zatca';
 
+import { dayDate, dayString, immutableError } from './dates';
+import { lineToInput } from './lines';
 import { allocateNumber } from './numbering';
 import { buyerParty, sellerParty } from './parties';
 import { toZatcaInput } from './zatca-mapper';
@@ -39,12 +42,9 @@ const LEASE_MS = 2 * 60_000;
 const MISSING_CREDENTIALS = 'Missing ZATCA credentials for this unit; re-onboard required';
 const AUTH_ERROR_PREFIX = 'ZATCA rejected the credentials';
 
-const dayString = (d: Date | null) => d?.toISOString().slice(0, 10) ?? null;
-const lockFailure = () =>
-  new ConflictError('Issued documents cannot be changed (DOCUMENT_IMMUTABLE)', { code: 'DOCUMENT_IMMUTABLE' });
 
 /** Missing fields a STANDARD invoice needs on its buyer (plan step 1.3), in form order. */
-export function missingBuyerFields(buyer: PartySnapshot | null): string[] {
+function missingBuyerFields(buyer: PartySnapshot | null): string[] {
   if (!buyer) return ['name', 'vatNumber', 'buildingNumber', 'postalCode', 'district', 'street', 'city'];
   const a = buyer.address;
   const missing: string[] = [];
@@ -99,7 +99,7 @@ async function issue(businessId: string, documentId: string, opts: IssuanceOptio
         where: { id: documentId },
         include: { lines: { orderBy: { position: 'asc' } }, customer: true },
       });
-      if (doc.status !== 'DRAFT') throw lockFailure();
+      if (doc.status !== 'DRAFT') throw immutableError();
 
       // 3. Issue-time rules.
       const seller = sellerParty(business);
@@ -156,17 +156,7 @@ async function issue(businessId: string, documentId: string, opts: IssuanceOptio
         noteReason: doc.noteReason,
         docDiscountHalalas: doc.docDiscountHalalas,
         docDiscountReason: doc.docDiscountReason,
-        lines: doc.lines.map((l) => ({
-          description: l.description,
-          unitCode: l.unitCode,
-          quantity: l.quantity.toString(),
-          unitPriceHalalas: l.unitPriceHalalas,
-          lineDiscountHalalas: l.lineDiscountHalalas,
-          taxCategory: l.taxCategory,
-          taxRateBp: l.taxRateBp,
-          exemptionReasonCode: l.exemptionReasonCode,
-          exemptionReason: l.exemptionReason,
-        })),
+        lines: doc.lines.map(lineToInput),
       });
       if (input.totals.payableHalalas !== doc.payableHalalas) {
         throw new Error('Stored totals no longer match the VAT engine; refusing to sign');
@@ -192,7 +182,7 @@ async function issue(businessId: string, documentId: string, opts: IssuanceOptio
           signedXml,
           qrBase64: qr,
           signingTime: now,
-          issueDate: new Date(`${issueDate}T00:00:00.000Z`),
+          issueDate: dayDate(issueDate),
           issueTime,
           issuedAt: now,
           sellerSnapshot: seller as unknown as Prisma.InputJsonValue,
@@ -201,16 +191,14 @@ async function issue(businessId: string, documentId: string, opts: IssuanceOptio
           submissionStatus: 'PENDING_RETRY',
           isTest: environment === 'SIMULATION',
         },
+        select: { id: true },
       });
-      await tx.egsUnit.update({ where: { id: egs.id }, data: { lastIcv: icv, lastInvoiceHash: invoiceHash } });
+      await tx.egsUnit.update({ where: { id: egs.id }, data: { lastIcv: icv, lastInvoiceHash: invoiceHash }, select: { id: true } });
       return documentId;
     },
     { maxWait: 30_000, timeout: 60_000 },
   );
 }
-
-const asRecord = (v: unknown): Record<string, unknown> =>
-  v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 
 /**
  * Sends one ISSUED, PENDING_RETRY document to ZATCA (outside any transaction) and records the outcome.
@@ -230,9 +218,13 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
   });
   if (!claimed.count) return; // already submitted, or another worker has it
 
+  let released = false; // set once the outcome write has cleared the lease
   try {
-    const doc = await prisma.document.findUniqueOrThrow({ where: { id: documentId }, include: { egsUnit: true } });
-    const egs: EgsUnit | null = doc.egsUnit;
+    const doc = await prisma.document.findUniqueOrThrow({
+      where: { id: documentId },
+      select: { subtype: true, signedXml: true, uuid: true, invoiceHash: true, egsUnit: true },
+    });
+    const egs = doc.egsUnit;
     if (!egs?.productionCsidEnc || !egs.productionSecretEnc || !doc.signedXml || !doc.uuid || !doc.invoiceHash) {
       log.error('zatca.submit_missing_credentials', { documentId });
       // Visible on the ZATCA page, and the attempt time moves the document to the back of the retry queue.
@@ -264,10 +256,24 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
 
     const body = asRecord(res.body);
     const { clearedInvoice, ...storedBody } = body;
+    // ASSUMPTION (see client.ts): on DUPLICATE ZATCA already has this document. A reported one is done; a cleared one
+    // lost its response, and the cleared XML cannot be re-fetched, so it stays pending with a note. Confirm at the Simulation gate.
+    const submissionNote =
+      res.outcome !== 'DUPLICATE'
+        ? undefined
+        : cleared
+          ? 'ZATCA reports this document already cleared; clearance XML unavailable, check the Fatoora portal'
+          : 'ZATCA reports this document already received; confirm in the Fatoora portal';
     const data: Prisma.DocumentUpdateInput = {
+      submittingSince: null,
       submissionAttempts: { increment: 1 },
       lastAttemptAt: now,
-      zatcaResponse: { httpStatus: res.httpStatus, outcome: res.outcome, ...storedBody } as Prisma.InputJsonValue,
+      zatcaResponse: {
+        httpStatus: res.httpStatus,
+        outcome: res.outcome,
+        ...storedBody,
+        ...(submissionNote && { submissionNote }),
+      } as Prisma.InputJsonValue,
     };
     if (res.outcome === 'PASS' || res.outcome === 'WARNING') {
       data.submissionStatus = cleared ? 'CLEARED' : 'REPORTED';
@@ -279,16 +285,6 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
         if (qr) data.qrBase64 = qr;
       }
     } else if (res.outcome === 'DUPLICATE') {
-      // ASSUMPTION (see client.ts): ZATCA already has this document. A reported one is done; a cleared one lost its
-      // response, and the cleared XML cannot be re-fetched, so it stays pending with a note. Confirm at the Simulation gate.
-      data.zatcaResponse = {
-        httpStatus: res.httpStatus,
-        outcome: res.outcome,
-        ...storedBody,
-        submissionNote: cleared
-          ? 'ZATCA reports this document already cleared; clearance XML unavailable, check the Fatoora portal'
-          : 'ZATCA reports this document already received; confirm in the Fatoora portal',
-      } as Prisma.InputJsonValue;
       if (!cleared) {
         data.submissionStatus = 'REPORTED';
         data.hasWarnings = true;
@@ -303,13 +299,15 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
     }
     try {
       await prisma.document.update({ where: { id: documentId }, data });
+      released = true;
     } catch (err) {
       // ZATCA has answered but the outcome was not saved: retry once; a resubmission would later answer DUPLICATE.
-      log.error('zatca.outcome_write_failed', { documentId, error: err instanceof Error ? err.message : String(err) });
+      log.error('zatca.outcome_write_failed', { documentId, error: errMsg(err) });
       try {
         await prisma.document.update({ where: { id: documentId }, data });
+        released = true;
       } catch (err2) {
-        log.error('zatca.outcome_lost', { documentId, httpStatus: res.httpStatus, outcome: res.outcome, error: err2 instanceof Error ? err2.message : String(err2) });
+        log.error('zatca.outcome_lost', { documentId, httpStatus: res.httpStatus, outcome: res.outcome, error: errMsg(err2) });
         throw err2;
       }
     }
@@ -318,7 +316,12 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
       await prisma.egsUnit.updateMany({ where: { id: egs.id, lastError: { startsWith: AUTH_ERROR_PREFIX } }, data: { lastError: null } });
     }
   } finally {
-    await prisma.document.update({ where: { id: documentId }, data: { submittingSince: null } });
+    if (!released) {
+      // Never let a failed release mask the original error; the lease expires on its own after LEASE_MS.
+      await prisma.document
+        .updateMany({ where: { id: documentId }, data: { submittingSince: null } })
+        .catch((err) => log.error('zatca.lease_release_failed', { documentId, error: errMsg(err) }));
+    }
   }
 }
 
@@ -332,7 +335,7 @@ export const issuanceService = {
     try {
       await submit(documentId, opts);
     } catch (err) {
-      log.error('zatca.submit_failed', { documentId, error: err instanceof Error ? err.message : String(err) });
+      log.error('zatca.submit_failed', { documentId, error: errMsg(err) });
     }
   },
 
@@ -363,7 +366,7 @@ export const issuanceService = {
       try {
         await submit(d.id, opts);
       } catch (err) {
-        log.error('zatca.retry_failed', { documentId: d.id, error: err instanceof Error ? err.message : String(err) });
+        log.error('zatca.retry_failed', { documentId: d.id, error: errMsg(err) });
       }
     }
     return { processed };

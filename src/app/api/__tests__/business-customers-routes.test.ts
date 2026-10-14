@@ -96,6 +96,11 @@ describe('/api/app/customers', () => {
     expect((await createCustomer(json('POST', { name: 'X' }))).status).toBe(409);
   });
 
+  it('402 wins over 409 when there is neither a subscription nor a business', async () => {
+    await login({ subscribed: false });
+    expect((await listCustomers(new Request('http://t/api/app/customers'))).status).toBe(402);
+  });
+
   it("AC3.4: another business's customer is a 404 on GET, PATCH and DELETE, and not listed", async () => {
     const a = await login();
     await putBusiness(json('PUT', validBusiness()));

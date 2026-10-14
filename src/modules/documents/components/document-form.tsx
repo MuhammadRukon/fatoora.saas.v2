@@ -64,7 +64,7 @@ const emptyDraft = (kind: DocumentKind): DocumentDraftInput => ({
 });
 
 /** The stored draft as form values (amounts stay halalas, empty optionals become ''). */
-export const draftToForm = (d: DocumentDTO): DocumentDraftInput => ({
+const draftToForm = (d: DocumentDTO): DocumentDraftInput => ({
   kind: d.kind,
   subtype: d.subtype,
   customerId: d.customerId ?? '',
@@ -283,7 +283,10 @@ function CustomerPicker({
 }) {
   const [q, setQ] = useState('');
   const [name, setName] = useState(initialName);
-  const { data, isFetching } = useCustomers(q);
+  const [opened, setOpened] = useState(false);
+  // Fetch once the list is opened, or to resolve the label of a customer set without a known name.
+  const needsLabel = !!form.watch('customerId') && !name;
+  const { data, isFetching } = useCustomers(q, opened || needsLabel);
   const options = (data?.pages.flatMap((p) => p.items) ?? []).map((c) => ({
     id: c.id,
     label: c.name,
@@ -306,6 +309,7 @@ function CustomerPicker({
               searchPlaceholder="Search by name or VAT number"
               emptyText="No customers found."
               onSearch={setQ}
+              onOpenChange={(o) => o && setOpened(true)}
               onSelect={(o) => {
                 setName(o.label);
                 field.onChange(o.id);

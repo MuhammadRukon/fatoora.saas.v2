@@ -1,19 +1,12 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { apiFetch, ApiClientError } from '@/lib/fetcher';
+import { apiFetch, ApiClientError, errorToast } from '@/lib/fetcher';
 import { queryKeys } from '@/constants/queryKeys';
 import type { DocumentDraftData, DocumentDTO, DocumentListItemDTO, DocumentListQuery } from '@/contracts/documents';
+import type { CursorPage } from '@/server/common/pagination';
 
-interface DocumentPage {
-  items: DocumentListItemDTO[];
-  nextCursor: string | null;
-}
-
-export type DocumentFilters = Pick<DocumentListQuery, 'kind' | 'status' | 'submissionStatus' | 'q'>;
-
-const errorToast = (fallback: string) => (err: unknown) =>
-  toast.error(err instanceof ApiClientError ? err.message : fallback);
+type DocumentFilters = Pick<DocumentListQuery, 'kind' | 'status' | 'submissionStatus' | 'q'>;
 
 export function useDocuments(filters: DocumentFilters) {
   return useInfiniteQuery({
@@ -23,7 +16,7 @@ export function useDocuments(filters: DocumentFilters) {
       const params = new URLSearchParams({ limit: '50' });
       for (const [k, v] of Object.entries(filters)) if (v) params.set(k, v);
       if (pageParam) params.set('cursor', pageParam);
-      return apiFetch<DocumentPage>(`/api/app/documents?${params}`);
+      return apiFetch<CursorPage<DocumentListItemDTO>>(`/api/app/documents?${params}`);
     },
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
@@ -47,7 +40,7 @@ export function useSaveDocument(id?: string) {
         : apiFetch<DocumentDTO>('/api/app/documents', { method: 'POST', body: input }),
     onSuccess: (doc) => {
       qc.setQueryData(queryKeys.documents.detail(doc.id), doc);
-      void qc.invalidateQueries({ queryKey: queryKeys.documents.all });
+      void qc.invalidateQueries({ queryKey: queryKeys.documents.lists }); // the detail was just set
       toast.success(id ? 'Draft saved' : 'Draft created');
     },
     onError: errorToast('Could not save the draft'),
@@ -60,7 +53,7 @@ export function useDeleteDocument(id: string) {
     mutationFn: () => apiFetch<null>(`/api/app/documents/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     onSuccess: () => {
       qc.removeQueries({ queryKey: queryKeys.documents.detail(id) });
-      void qc.invalidateQueries({ queryKey: queryKeys.documents.all });
+      void qc.invalidateQueries({ queryKey: queryKeys.documents.lists }); // the detail was just set
       toast.success('Draft deleted');
     },
     onError: errorToast('Could not delete the draft'),
@@ -73,7 +66,7 @@ export function useDuplicateDocument(id: string) {
     mutationFn: () => apiFetch<DocumentDTO>(`/api/app/documents/${encodeURIComponent(id)}/duplicate`, { method: 'POST' }),
     onSuccess: (doc) => {
       qc.setQueryData(queryKeys.documents.detail(doc.id), doc);
-      void qc.invalidateQueries({ queryKey: queryKeys.documents.all });
+      void qc.invalidateQueries({ queryKey: queryKeys.documents.lists }); // the detail was just set
       toast.success('Copied to a new draft');
     },
     onError: errorToast('Could not duplicate the document'),
@@ -93,7 +86,7 @@ function useDocumentAction(id: string, action: 'issue' | 'retry', failure: strin
     mutationFn: () => apiFetch<DocumentDTO>(`/api/app/documents/${encodeURIComponent(id)}/${action}`, { method: 'POST' }),
     onSuccess: (doc) => {
       qc.setQueryData(queryKeys.documents.detail(doc.id), doc);
-      void qc.invalidateQueries({ queryKey: queryKeys.documents.all });
+      void qc.invalidateQueries({ queryKey: queryKeys.documents.lists }); // the detail was just set
       verdictToast(doc);
     },
     onError: errorToast(failure),

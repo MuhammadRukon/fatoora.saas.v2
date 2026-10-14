@@ -14,15 +14,3 @@ export function formatDate(value: Date | string): string {
     timeZone: 'UTC',
   });
 }
-
-export function getDiscountPercentString(price: number, originalPrice: number): string {
-  if (!price || !originalPrice || price >= originalPrice) {
-    return '';
-  }
-
-  const rawPercent = ((originalPrice - price) / originalPrice) * 100;
-  const roundedPercent = Math.round(rawPercent);
-  const isFractional = !Number.isInteger(rawPercent);
-
-  return `${isFractional ? '~' : ''}${roundedPercent}%`;
-}

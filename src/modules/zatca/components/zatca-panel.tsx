@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ApiClientError } from '@/lib/fetcher';
+import { apiErrorMessage } from '@/lib/fetcher';
 import { useOnboard, useZatcaStatus } from '@/modules/zatca/hooks';
 
 // One portal serves both environments; the user picks Simulation or Production after signing in (unverified, see docs).
@@ -44,7 +44,7 @@ export function ZatcaPanel() {
   const active = egs?.status === 'ACTIVE';
   const daysLeft = egs?.certNotAfter ? Math.floor((new Date(egs.certNotAfter).getTime() - Date.now()) / 86_400_000) : null;
   const result = onboard.data;
-  const requestError = onboard.error instanceof ApiClientError ? onboard.error.message : onboard.error ? 'Request failed' : null;
+  const requestError = onboard.error ? apiErrorMessage(onboard.error, 'Request failed') : null;
   const errors = [...(result?.errors ?? []), ...(egs?.status === 'FAILED' && !result ? [egs.lastError ?? ''] : [])]
     .join('\n')
     .split('\n')

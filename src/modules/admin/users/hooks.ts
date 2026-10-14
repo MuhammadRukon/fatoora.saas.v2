@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { apiFetch, ApiClientError } from '@/lib/fetcher';
+import { apiFetch } from '@/lib/fetcher';
 import { queryKeys } from '@/constants/queryKeys';
 import type { SubscriptionDTO } from '@/contracts/subscriptions';
 import type { AdminUser } from '@/server/users/users.service';
@@ -9,7 +9,6 @@ import type { AdminUser } from '@/server/users/users.service';
 const USERS_URL = '/api/admin/users';
 
 function explainError(err: unknown, fallback: string): string {
-  if (err instanceof ApiClientError) return err.message || fallback;
   if (err instanceof Error) return err.message || fallback;
   return fallback;
 }
