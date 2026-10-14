@@ -92,9 +92,9 @@ Forms use react-hook-form + `zodResolver` with the *same* contract schema. Toast
 ## Conventions
 
 - Path alias `@/*` maps to `src/*`.
-- Slugs via `src/server/common/slug.ts`; pagination via `src/server/common/pagination.ts`.
+- Pagination via `src/server/common/pagination.ts`.
 - Rate limiting (`src/server/common/rate-limit.ts`) is Postgres-backed via the `RateLimitBucket` model so it works across serverless instances; Redis is an optional layer on top (250 ms timeout) and any Redis failure falls back to Postgres. Applied to login, signup, forgot, reset, verify, resend-verify and change-password.
-- Mailer (`src/server/common/mailer.ts`) uses Resend; with `RESEND_API_KEY` unset it logs and skips instead of sending (and signup returns a `devCode`). **Test env blanks these vars** to prevent actual sends during test runs.
+- Mailer (`src/server/common/mailer.ts`) uses Resend; with `RESEND_API_KEY` unset it logs and skips instead of sending (and, outside production, signup returns a `devCode`); both `RESEND_API_KEY` and `EMAIL_FROM` are required when `NODE_ENV=production`. **Test env blanks these vars** to prevent actual sends during test runs.
 - Component trees: `src/components/ui/*` are generated shadcn primitives (edit sparingly), `src/components/*` are shared app components.
 - Tests: Vitest runs in the **node** environment via `vitest.config.ts`. **Test DB must be local**; `vitest.global-setup.ts` aborts on a non-local `DATABASE_URL`/`SHADOW_DATABASE_URL` or a missing `DATABASE_URL`, with no opt-out; run tests via `npm test` (dotenv-cli loads `.env.dev`). Pure functions in `src/server/common` are the easiest targets. Route-level tests live in `src/app/api/__tests__`; there is no browser E2E yet.
 
