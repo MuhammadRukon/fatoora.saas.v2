@@ -296,7 +296,8 @@ model Document {
   /// Allocated at issue time under a Business row lock (documents.service allocateNumber).
   sequence              Int?
   number                String?
-  /// Restrict: a customer used by a document cannot be deleted (CUSTOMER_HAS_DOCUMENTS).
+  /// NoAction (= Restrict, checked at statement end): a customer used by a document cannot be deleted
+  /// (CUSTOMER_HAS_DOCUMENTS). Not Restrict: Postgres reports that as 23001, which Prisma does not map to P2003.
   customerId            String?
   /// Frozen seller/buyer copies, written at issue (shape: PartySnapshot in contracts/documents).
   buyerSnapshot         Json?
@@ -340,7 +341,7 @@ model Document {
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
   business              Business         @relation(fields: [businessId], references: [id])
-  customer              Customer?        @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customer              Customer?        @relation(fields: [customerId], references: [id], onDelete: NoAction)
   /// NoAction (checked at statement end) so a note and its original can be removed in one deleteMany.
   billingReference      Document?        @relation("DocumentBillingReference", fields: [billingReferenceId], references: [id], onDelete: NoAction)
   referencedBy          Document[]       @relation("DocumentBillingReference")
