@@ -103,7 +103,7 @@ export function createZatcaClient(env: ZatcaEnvironment, fetchImpl: typeof fetch
   };
 }
 
-const asRecord = (v: unknown): Record<string, unknown> =>
+export const asRecord = (v: unknown): Record<string, unknown> =>
   v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 const asArray = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const line = (m: unknown) => {

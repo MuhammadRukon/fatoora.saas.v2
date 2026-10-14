@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Prisma, type EgsUnit } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
 import type { PartySnapshot } from '@/contracts/documents';
 import { env } from '@/env';
@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { ConflictError, NotFoundError, ValidationError, errMsg } from '@/server/common/errors';
 import { log } from '@/server/common/logger';
 import {
+  asRecord,
   createZatcaClient,
   decrypt,
   extractQrFromXml,
@@ -198,9 +199,6 @@ async function issue(businessId: string, documentId: string, opts: IssuanceOptio
   );
 }
 
-const asRecord = (v: unknown): Record<string, unknown> =>
-  v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
-
 /**
  * Sends one ISSUED, PENDING_RETRY document to ZATCA (outside any transaction) and records the outcome.
  * A lease column keeps cron and manual retry from submitting the same document twice.
@@ -221,7 +219,7 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
 
   try {
     const doc = await prisma.document.findUniqueOrThrow({ where: { id: documentId }, include: { egsUnit: true } });
-    const egs: EgsUnit | null = doc.egsUnit;
+    const egs = doc.egsUnit;
     if (!egs?.productionCsidEnc || !egs.productionSecretEnc || !doc.signedXml || !doc.uuid || !doc.invoiceHash) {
       log.error('zatca.submit_missing_credentials', { documentId });
       // Visible on the ZATCA page, and the attempt time moves the document to the back of the retry queue.
@@ -253,10 +251,23 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
 
     const body = asRecord(res.body);
     const { clearedInvoice, ...storedBody } = body;
+    // ASSUMPTION (see client.ts): on DUPLICATE ZATCA already has this document. A reported one is done; a cleared one
+    // lost its response, and the cleared XML cannot be re-fetched, so it stays pending with a note. Confirm at the Simulation gate.
+    const submissionNote =
+      res.outcome !== 'DUPLICATE'
+        ? undefined
+        : cleared
+          ? 'ZATCA reports this document already cleared; clearance XML unavailable, check the Fatoora portal'
+          : 'ZATCA reports this document already received; confirm in the Fatoora portal';
     const data: Prisma.DocumentUpdateInput = {
       submissionAttempts: { increment: 1 },
       lastAttemptAt: now,
-      zatcaResponse: { httpStatus: res.httpStatus, outcome: res.outcome, ...storedBody } as Prisma.InputJsonValue,
+      zatcaResponse: {
+        httpStatus: res.httpStatus,
+        outcome: res.outcome,
+        ...storedBody,
+        ...(submissionNote && { submissionNote }),
+      } as Prisma.InputJsonValue,
     };
     if (res.outcome === 'PASS' || res.outcome === 'WARNING') {
       data.submissionStatus = cleared ? 'CLEARED' : 'REPORTED';
@@ -268,16 +279,6 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
         if (qr) data.qrBase64 = qr;
       }
     } else if (res.outcome === 'DUPLICATE') {
-      // ASSUMPTION (see client.ts): ZATCA already has this document. A reported one is done; a cleared one lost its
-      // response, and the cleared XML cannot be re-fetched, so it stays pending with a note. Confirm at the Simulation gate.
-      data.zatcaResponse = {
-        httpStatus: res.httpStatus,
-        outcome: res.outcome,
-        ...storedBody,
-        submissionNote: cleared
-          ? 'ZATCA reports this document already cleared; clearance XML unavailable, check the Fatoora portal'
-          : 'ZATCA reports this document already received; confirm in the Fatoora portal',
-      } as Prisma.InputJsonValue;
       if (!cleared) {
         data.submissionStatus = 'REPORTED';
         data.hasWarnings = true;

@@ -1,4 +1,4 @@
-import { Prisma, type Business, type Customer, type Document, type DocumentLine } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
 import type {
   DocumentDTO,
@@ -18,14 +18,6 @@ import { lineToInput } from './lines';
 import { buyerParty, sellerParty } from './parties';
 import { computeDocument, STANDARD_RATE_BP } from './vat-engine';
 
-type DocumentRow = Document & {
-  lines: DocumentLine[];
-  business: Business;
-  customer: Customer | null;
-  billingReference: { id: string; number: string | null } | null;
-  egsUnit: { lastError: string | null } | null;
-};
-
 const include = {
   lines: { orderBy: { position: 'asc' } },
   business: true,
@@ -33,6 +25,8 @@ const include = {
   billingReference: { select: { id: true, number: true } },
   egsUnit: { select: { lastError: true } },
 } satisfies Prisma.DocumentInclude;
+
+type DocumentRow = Prisma.DocumentGetPayload<{ include: typeof include }>;
 
 const iso = (d: Date | null) => d?.toISOString() ?? null;
 
