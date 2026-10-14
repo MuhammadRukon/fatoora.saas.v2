@@ -13,6 +13,8 @@ import { clampLimit, type CursorPage } from '@/server/common/pagination';
 
 import { summarizeValidation } from '@/server/zatca';
 
+import { dayDate, dayString, immutableError } from './dates';
+import { lineToInput } from './lines';
 import { buyerParty, sellerParty } from './parties';
 import { computeDocument, STANDARD_RATE_BP } from './vat-engine';
 
@@ -32,22 +34,12 @@ const include = {
   egsUnit: { select: { lastError: true } },
 } satisfies Prisma.DocumentInclude;
 
-const dayString = (d: Date | null) => d?.toISOString().slice(0, 10) ?? null;
-const dayDate = (s: string | null) => (s ? new Date(`${s}T00:00:00.000Z`) : null);
 const iso = (d: Date | null) => d?.toISOString() ?? null;
 
 /** Issued documents show their frozen snapshots; drafts the live seller and customer. */
 function toDTO(d: DocumentRow): DocumentDTO {
   const computed = computeDocument({
-    lines: d.lines.map((l) => ({
-      quantity: l.quantity.toString(),
-      unitPriceHalalas: l.unitPriceHalalas,
-      lineDiscountHalalas: l.lineDiscountHalalas,
-      taxCategory: l.taxCategory,
-      taxRateBp: l.taxRateBp,
-      exemptionReasonCode: l.exemptionReasonCode,
-      exemptionReason: l.exemptionReason,
-    })),
+    lines: d.lines.map(lineToInput),
     docDiscountHalalas: d.docDiscountHalalas,
   });
   const verdict = summarizeValidation(d.zatcaResponse);
@@ -115,14 +107,12 @@ function toDTO(d: DocumentRow): DocumentDTO {
 
 /** Totals and line amounts always come from the engine; client-sent amounts do not exist in the contract. */
 function compute(data: DocumentDraftData) {
-  const computed = computeDocument({
-    lines: data.lines.map((l) => ({
-      ...l,
-      taxRateBp: l.taxRateBp ?? (l.taxCategory === 'S' ? STANDARD_RATE_BP : 0),
-    })),
-    docDiscountHalalas: data.docDiscountHalalas,
-  });
-  const lines = data.lines.map((l, i) => ({
+  const rated = data.lines.map((l) => ({
+    ...l,
+    taxRateBp: l.taxRateBp ?? (l.taxCategory === 'S' ? STANDARD_RATE_BP : 0),
+  }));
+  const computed = computeDocument({ lines: rated, docDiscountHalalas: data.docDiscountHalalas });
+  const lines = rated.map((l, i) => ({
     position: i + 1,
     description: l.description,
     descriptionAr: l.descriptionAr,
@@ -131,7 +121,7 @@ function compute(data: DocumentDraftData) {
     unitPriceHalalas: l.unitPriceHalalas,
     lineDiscountHalalas: l.lineDiscountHalalas,
     taxCategory: l.taxCategory,
-    taxRateBp: l.taxRateBp ?? (l.taxCategory === 'S' ? STANDARD_RATE_BP : 0),
+    taxRateBp: l.taxRateBp,
     // Only Z/E carry a code and only O the free text; stale values from a category switch are dropped.
     exemptionReasonCode: l.taxCategory === 'Z' || l.taxCategory === 'E' ? l.exemptionReasonCode : null,
     exemptionReason: l.taxCategory === 'O' ? l.exemptionReason : null,
@@ -188,9 +178,6 @@ async function loadInTx(tx: Prisma.TransactionClient, businessId: string, id: st
   return row;
 }
 
-const immutable = () =>
-  new ConflictError('Issued documents cannot be changed (DOCUMENT_IMMUTABLE)', { code: 'DOCUMENT_IMMUTABLE' });
-
 /** Every query is scoped by businessId (from resolveBusinessId, never from the client). */
 export const documentsService = {
   createDraft(businessId: string, data: DocumentDraftData): Promise<DocumentDTO> {
@@ -209,14 +196,14 @@ export const documentsService = {
     const { lines, totals } = compute(data);
     return prisma.$transaction(async (tx) => {
       const current = await loadInTx(tx, businessId, id);
-      if (current.status !== 'DRAFT') throw immutable();
+      if (current.status !== 'DRAFT') throw immutableError();
       const billingReferenceId = await checkReferences(tx, businessId, data);
       // The status guard keeps this safe if the document is issued between the read and the write.
       const { count } = await tx.document.updateMany({
         where: { id, businessId, status: 'DRAFT' },
         data: draftColumns(data, totals, billingReferenceId),
       });
-      if (!count) throw immutable();
+      if (!count) throw immutableError();
       await tx.documentLine.deleteMany({ where: { documentId: id } });
       await tx.documentLine.createMany({ data: lines.map((l) => ({ ...l, documentId: id })) });
       return toDTO(await loadInTx(tx, businessId, id));
@@ -227,7 +214,7 @@ export const documentsService = {
     const { count } = await prisma.document.deleteMany({ where: { id, businessId, status: 'DRAFT' } });
     if (count) return;
     const exists = await prisma.document.findFirst({ where: { id, businessId }, select: { id: true } });
-    throw exists ? immutable() : new NotFoundError('Document');
+    throw exists ? immutableError() : new NotFoundError('Document');
   },
 
   async get(businessId: string, id: string): Promise<DocumentDTO> {
@@ -328,18 +315,7 @@ export const documentsService = {
       billingReferenceId: src.billingReferenceId,
       noteReason: src.noteReason,
       notes: src.notes,
-      lines: src.lines.map((l) => ({
-        description: l.description,
-        descriptionAr: l.descriptionAr,
-        quantity: l.quantity.toString(),
-        unitCode: l.unitCode,
-        unitPriceHalalas: l.unitPriceHalalas,
-        lineDiscountHalalas: l.lineDiscountHalalas,
-        taxCategory: l.taxCategory,
-        taxRateBp: l.taxRateBp,
-        exemptionReasonCode: l.exemptionReasonCode,
-        exemptionReason: l.exemptionReason,
-      })),
+      lines: src.lines.map(lineToInput),
     });
   },
 };

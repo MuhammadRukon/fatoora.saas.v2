@@ -4,7 +4,7 @@ import { Prisma, type EgsUnit } from '@prisma/client';
 import type { PartySnapshot } from '@/contracts/documents';
 import { env } from '@/env';
 import { prisma } from '@/lib/prisma';
-import { ConflictError, NotFoundError, ValidationError } from '@/server/common/errors';
+import { ConflictError, NotFoundError, ValidationError, errMsg } from '@/server/common/errors';
 import { log } from '@/server/common/logger';
 import {
   createZatcaClient,
@@ -19,6 +19,8 @@ import {
   type ZatcaResponse,
 } from '@/server/zatca';
 
+import { dayDate, dayString, immutableError } from './dates';
+import { lineToInput } from './lines';
 import { allocateNumber } from './numbering';
 import { buyerParty, sellerParty } from './parties';
 import { toZatcaInput } from './zatca-mapper';
@@ -39,9 +41,6 @@ const LEASE_MS = 2 * 60_000;
 const MISSING_CREDENTIALS = 'Missing ZATCA credentials for this unit; re-onboard required';
 const AUTH_ERROR_PREFIX = 'ZATCA rejected the credentials';
 
-const dayString = (d: Date | null) => d?.toISOString().slice(0, 10) ?? null;
-const lockFailure = () =>
-  new ConflictError('Issued documents cannot be changed (DOCUMENT_IMMUTABLE)', { code: 'DOCUMENT_IMMUTABLE' });
 
 /** Missing fields a STANDARD invoice needs on its buyer (plan step 1.3), in form order. */
 function missingBuyerFields(buyer: PartySnapshot | null): string[] {
@@ -99,7 +98,7 @@ async function issue(businessId: string, documentId: string, opts: IssuanceOptio
         where: { id: documentId },
         include: { lines: { orderBy: { position: 'asc' } }, customer: true },
       });
-      if (doc.status !== 'DRAFT') throw lockFailure();
+      if (doc.status !== 'DRAFT') throw immutableError();
 
       // 3. Issue-time rules.
       const seller = sellerParty(business);
@@ -156,17 +155,7 @@ async function issue(businessId: string, documentId: string, opts: IssuanceOptio
         noteReason: doc.noteReason,
         docDiscountHalalas: doc.docDiscountHalalas,
         docDiscountReason: doc.docDiscountReason,
-        lines: doc.lines.map((l) => ({
-          description: l.description,
-          unitCode: l.unitCode,
-          quantity: l.quantity.toString(),
-          unitPriceHalalas: l.unitPriceHalalas,
-          lineDiscountHalalas: l.lineDiscountHalalas,
-          taxCategory: l.taxCategory,
-          taxRateBp: l.taxRateBp,
-          exemptionReasonCode: l.exemptionReasonCode,
-          exemptionReason: l.exemptionReason,
-        })),
+        lines: doc.lines.map(lineToInput),
       });
       if (input.totals.payableHalalas !== doc.payableHalalas) {
         throw new Error('Stored totals no longer match the VAT engine; refusing to sign');
@@ -192,7 +181,7 @@ async function issue(businessId: string, documentId: string, opts: IssuanceOptio
           signedXml,
           qrBase64: qr,
           signingTime: now,
-          issueDate: new Date(`${issueDate}T00:00:00.000Z`),
+          issueDate: dayDate(issueDate),
           issueTime,
           issuedAt: now,
           sellerSnapshot: seller as unknown as Prisma.InputJsonValue,
@@ -305,11 +294,11 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
       await prisma.document.update({ where: { id: documentId }, data });
     } catch (err) {
       // ZATCA has answered but the outcome was not saved: retry once; a resubmission would later answer DUPLICATE.
-      log.error('zatca.outcome_write_failed', { documentId, error: err instanceof Error ? err.message : String(err) });
+      log.error('zatca.outcome_write_failed', { documentId, error: errMsg(err) });
       try {
         await prisma.document.update({ where: { id: documentId }, data });
       } catch (err2) {
-        log.error('zatca.outcome_lost', { documentId, httpStatus: res.httpStatus, outcome: res.outcome, error: err2 instanceof Error ? err2.message : String(err2) });
+        log.error('zatca.outcome_lost', { documentId, httpStatus: res.httpStatus, outcome: res.outcome, error: errMsg(err2) });
         throw err2;
       }
     }
@@ -332,7 +321,7 @@ export const issuanceService = {
     try {
       await submit(documentId, opts);
     } catch (err) {
-      log.error('zatca.submit_failed', { documentId, error: err instanceof Error ? err.message : String(err) });
+      log.error('zatca.submit_failed', { documentId, error: errMsg(err) });
     }
   },
 
@@ -363,7 +352,7 @@ export const issuanceService = {
       try {
         await submit(d.id, opts);
       } catch (err) {
-        log.error('zatca.retry_failed', { documentId: d.id, error: err instanceof Error ? err.message : String(err) });
+        log.error('zatca.retry_failed', { documentId: d.id, error: errMsg(err) });
       }
     }
     return { processed };

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 
 import { auth } from '@/auth';
-import { ForbiddenError, UnauthorizedError, statusFromError, toJsonError } from './errors';
+import { ForbiddenError, UnauthorizedError, errMsg, statusFromError, toJsonError } from './errors';
 import { resolveBusinessId } from '@/server/business/business-context';
 import { subscriptionsService } from '@/server/subscriptions/subscriptions.service';
 import { log } from './logger';
@@ -94,7 +94,7 @@ export function jsonError(err: unknown): NextResponse {
   }
   const status = statusFromError(err);
   if (status >= 500) {
-    log.error('http.unhandled', { error: err instanceof Error ? err.message : String(err) });
+    log.error('http.unhandled', { error: errMsg(err) });
   }
   return NextResponse.json(toJsonError(err), { status });
 }

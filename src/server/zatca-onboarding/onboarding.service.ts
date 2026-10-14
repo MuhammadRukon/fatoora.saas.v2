@@ -3,7 +3,7 @@ import type { Business, EgsStatus, EgsUnit } from '@prisma/client';
 
 import { env } from '@/env';
 import { prisma } from '@/lib/prisma';
-import { ConflictError, NotFoundError } from '@/server/common/errors';
+import { ConflictError, NotFoundError, errMsg } from '@/server/common/errors';
 import { log } from '@/server/common/logger';
 import {
   buildComplianceDocuments,
@@ -248,7 +248,7 @@ export const onboardingService = {
       });
       return { status: 'ACTIVE', egsId: id, results, errors: [] };
     } catch (err) {
-      log.error('zatca.onboard_failed', { businessId, error: err instanceof Error ? err.message : String(err) });
+      log.error('zatca.onboard_failed', { businessId, error: errMsg(err) });
       await update({ status: 'FAILED', lastError: 'Onboarding failed unexpectedly; request a new OTP and try again' });
       throw err;
     } finally {

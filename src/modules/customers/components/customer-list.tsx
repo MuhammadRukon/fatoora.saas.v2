@@ -11,7 +11,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BUYER_ID_SCHEME_LABELS, type CustomerDTO } from '@/contracts/customers';
+import { ID_SCHEME_LABELS } from '@/contracts/common';
+import type { CustomerDTO } from '@/contracts/customers';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { useCustomers } from '@/modules/customers/hooks';
 
@@ -47,7 +48,7 @@ const columns: ColumnDef<CustomerDTO, unknown>[] = [
         </span>
       ) : c.buyerIdScheme ? (
         <span className="tabular-nums">
-          <span className="text-muted-foreground">{BUYER_ID_SCHEME_LABELS[c.buyerIdScheme]} </span>
+          <span className="text-muted-foreground">{ID_SCHEME_LABELS[c.buyerIdScheme]} </span>
           {c.buyerIdValue}
         </span>
       ) : (

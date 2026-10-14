@@ -11,8 +11,8 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FormSection, SelectField, TextField } from '@/components/form-fields';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
+import { ID_SCHEME_LABELS } from '@/contracts/common';
 import {
-  BUYER_ID_SCHEME_LABELS,
   customerInputSchema,
   type CustomerData,
   type CustomerDTO,
@@ -102,7 +102,7 @@ export function CustomerForm({ customer }: { customer?: CustomerDTO }) {
                 control={control}
                 name="buyerIdScheme"
                 label="ID type"
-                options={BUYER_ID_SCHEME_LABELS}
+                options={ID_SCHEME_LABELS}
                 noneLabel="No ID"
                 placeholder="No ID"
               />

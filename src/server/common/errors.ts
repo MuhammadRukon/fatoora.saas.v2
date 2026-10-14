@@ -71,6 +71,9 @@ export class ValidationError extends AppError {
   }
 }
 
+/** Message of any thrown value, for logs. */
+export const errMsg = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+
 export function statusFromError(err: unknown): number {
   return err instanceof AppError ? ERROR_STATUS[err.code] : 500;
 }
