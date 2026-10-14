@@ -79,6 +79,14 @@ export function ZatcaPanel() {
         </Alert>
       ) : null}
 
+      {active && egs.lastError ? (
+        <Alert variant="destructive">
+          <IconAlertTriangle />
+          <AlertTitle>Submission problem</AlertTitle>
+          <AlertDescription>{egs.lastError}</AlertDescription>
+        </Alert>
+      ) : null}
+
       {active ? (
         <Alert>
           <IconCircleCheck />

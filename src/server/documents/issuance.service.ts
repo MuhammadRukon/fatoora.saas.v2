@@ -32,6 +32,7 @@ export type IssuanceOptions = {
 const MAX_BATCH = 50;
 /** A claimed submission older than this is considered dead (the ZATCA client times out after 30 s). */
 const LEASE_MS = 2 * 60_000;
+const MISSING_CREDENTIALS = 'Missing ZATCA credentials for this unit; re-onboard required';
 const AUTH_ERROR_PREFIX = 'ZATCA rejected the credentials';
 
 const dayString = (d: Date | null) => d?.toISOString().slice(0, 10) ?? null;
@@ -225,6 +226,9 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
     const egs: EgsUnit | null = doc.egsUnit;
     if (!egs?.productionCsidEnc || !egs.productionSecretEnc || !doc.signedXml || !doc.uuid || !doc.invoiceHash) {
       log.error('zatca.submit_missing_credentials', { documentId });
+      // Visible on the ZATCA page, and the attempt time moves the document to the back of the retry queue.
+      if (egs) await prisma.egsUnit.update({ where: { id: egs.id }, data: { lastError: MISSING_CREDENTIALS } });
+      await prisma.document.update({ where: { id: documentId }, data: { lastAttemptAt: now } });
       return;
     }
     const auth: ZatcaAuth = {
@@ -307,11 +311,12 @@ export const issuanceService = {
     await submit(documentId, opts);
   },
 
-  /** Cron: the oldest PENDING_RETRY documents first, one at a time. */
+  /** Cron: PENDING_RETRY documents, least recently attempted first, one at a time. */
   async retryPending(opts: IssuanceOptions = {}) {
     const docs = await prisma.document.findMany({
       where: { status: 'ISSUED', submissionStatus: 'PENDING_RETRY' },
-      orderBy: { issuedAt: 'asc' },
+      // Least recently attempted first (never-tried on top), so a permanently failing document cannot hold the head of the queue.
+      orderBy: [{ lastAttemptAt: { sort: 'asc', nulls: 'first' } }, { issuedAt: 'asc' }],
       take: MAX_BATCH,
       select: { id: true },
     });
