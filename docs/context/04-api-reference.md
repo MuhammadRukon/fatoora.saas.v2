@@ -27,6 +27,9 @@ Signup, email verification (verify code, resend), forgot/reset and change-passwo
 | --- | --- | --- | --- |
 | `/api/app/business` | GET, PUT | app | GET returns the profile or `null`; PUT creates the first time, then updates; 422 on field errors; 409 `BUSINESS_LOCKED_FIELDS` |
 | `/api/app/customers` | GET, POST | app + business | GET `?q=&cursor=&limit=` cursor page; POST 201; 409 `BUSINESS_REQUIRED` before a business exists |
+| `/api/app/documents` | GET, POST | app + business | GET `?kind=&status=&submissionStatus=&q=&cursor=&limit=`; POST creates a DRAFT (201), totals engine-computed, unknown fields stripped; 422 on contract/engine errors, 409 `ORIGINAL_NOT_ISSUED`, 404 for another business's customer/original |
+| `/api/app/documents/[id]` | GET, PATCH, DELETE | app + business | PATCH/DELETE only on DRAFT (else 409 `DOCUMENT_IMMUTABLE`); other business's id is 404 |
+| `/api/app/documents/[id]/duplicate` | POST | app + business | copies any document into a new DRAFT (201) |
 | `/api/app/customers/[id]` | GET, PATCH, DELETE | app + business | another business's id is 404; DELETE 204; 409 `CUSTOMER_HAS_DOCUMENTS` once documents reference it |
 | `/api/app/zatca` | GET | app + business | `{environment, egs: {status, serialNumber, certNotAfter, lastError} \| null}`; never keys, tokens or secrets |
 | `/api/app/zatca/onboard` | POST | app + business | body `{otp: "123456"}` (422 otherwise); 429 after 5 attempts per hour per business; 409 if the EGS is already ACTIVE; 200 `{status, errors, results[]}` even when ZATCA rejected (`status: FAILED`, `errors` has ZATCA's text) |

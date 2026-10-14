@@ -24,7 +24,12 @@ Source of truth: [`prisma/schema.prisma`](../../prisma/schema.prisma). PostgreSQ
   - At most one PENDING row per user: partial unique index `Subscription_one_pending_per_user` (`WHERE status = 'PENDING'`), created in the migration SQL because Prisma cannot express it.
   - State (`src/server/subscriptions/subscriptions.service.ts`): ACTIVE if any ACTIVE row has `startsAt <= now < endsAt`, else PENDING if a request is open, else EXPIRED if any ACTIVE row ever existed, else NONE. Activation starts at `max(now, latest ACTIVE endsAt)` (stacking) and adds calendar months in UTC, clamped to month end.
 
-Businesses, EGS units, customers and documents are added by later plan phases.
+### Documents
+- **Document**: invoice, credit note or debit note (`kind`, `subtype`, `status` DRAFT/ISSUED), scoped by `businessId`. Money columns are integer halalas. `sequence`/`number` are null until issue (`@@unique([businessId, kind, sequence])`); `allocateNumber` (`src/server/documents/numbering.ts`) takes a `FOR UPDATE` lock on the Business row and returns `INV-/CN-/DN-` + 6 digits. `customerId` is `onDelete: NoAction` (acts as Restrict; Postgres reports a true RESTRICT as 23001, which Prisma does not map to P2003, so the `CUSTOMER_HAS_DOCUMENTS` mapping needs NoAction). `billingReferenceId` self-relation (NoAction). ZATCA columns (`uuid`, `icv`, `pih`, `signedXml`, `qrBase64`, `submissionStatus`...) stay null until Phase 7; `buyerSnapshot`/`sellerSnapshot` hold `PartySnapshot` (contracts/documents) written at issue.
+- **DocumentLine**: cascade; `quantity` Decimal(18,6), `taxRateBp` in basis points, per-line `net/vat/total` halalas.
+- Totals and line amounts are always computed server-side by the pure `computeDocument` (`src/server/documents/vat-engine.ts`, also used by the form preview): half-up rounding, VAT per line, tax per (category, rate, exemption reason) subtotal at document level.
+
+EGS onboarding and ZATCA issuance are added by later plan phases.
 
 ## Money
 

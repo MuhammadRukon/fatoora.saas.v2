@@ -179,6 +179,7 @@ model Business {
   owner            User             @relation(fields: [ownerId], references: [id])
   egsUnits         EgsUnit[]
   customers        Customer[]
+  documents        Document[]
 
   @@index([ownerId])
 }
@@ -211,6 +212,7 @@ model EgsUnit {
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
   business            Business         @relation(fields: [businessId], references: [id])
+  documents           Document[]
 
   @@index([businessId])
 }
@@ -235,6 +237,7 @@ model Customer {
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   business         Business       @relation(fields: [businessId], references: [id])
+  documents        Document[]
 
   @@index([businessId])
 }
@@ -248,4 +251,129 @@ model RateLimitBucket {
   updatedAt DateTime @updatedAt
 
   @@index([resetAt])
+}
+
+enum DocumentKind {
+  INVOICE
+  CREDIT_NOTE
+  DEBIT_NOTE
+}
+
+enum DocumentSubtype {
+  STANDARD
+  SIMPLIFIED
+}
+
+enum DocumentStatus {
+  DRAFT
+  ISSUED
+}
+
+enum SubmissionStatus {
+  NOT_SUBMITTED
+  PENDING_RETRY
+  REPORTED
+  CLEARED
+  REJECTED
+}
+
+/// ZATCA / UNCL5305 VAT category: standard, zero-rated, exempt, out of scope.
+enum TaxCategory {
+  S
+  Z
+  E
+  O
+}
+
+/// An invoice, credit note or debit note. Drafts are mutable; an ISSUED document never is.
+/// Money is integer halalas. The ZATCA columns stay null until issuance (Phase 7).
+model Document {
+  id                    String           @id @default(cuid())
+  businessId            String
+  kind                  DocumentKind
+  subtype               DocumentSubtype
+  status                DocumentStatus   @default(DRAFT)
+  /// Allocated at issue time under a Business row lock (documents.service allocateNumber).
+  sequence              Int?
+  number                String?
+  /// NoAction (= Restrict, checked at statement end): a customer used by a document cannot be deleted
+  /// (CUSTOMER_HAS_DOCUMENTS). Not Restrict: Postgres reports that as 23001, which Prisma does not map to P2003.
+  customerId            String?
+  /// Frozen seller/buyer copies, written at issue (shape: PartySnapshot in contracts/documents).
+  buyerSnapshot         Json?
+  sellerSnapshot        Json?
+  issueDate             DateTime?        @db.Date
+  /// hh:mm:ssZ (UTC), the same instant as issuedAt.
+  issueTime             String?
+  issuedAt              DateTime?
+  supplyDate            DateTime?        @db.Date
+  supplyEndDate         DateTime?        @db.Date
+  currency              String           @default("SAR")
+  /// UNTDID 4461: 10 cash, 30 credit, 42 bank account, 48 bank card, 1 not defined.
+  paymentMeansCode      String?
+  docDiscountHalalas    Int              @default(0)
+  docDiscountReason     String?
+  lineExtensionHalalas  Int              @default(0)
+  allowanceTotalHalalas Int              @default(0)
+  taxExclusiveHalalas   Int              @default(0)
+  taxHalalas            Int              @default(0)
+  taxInclusiveHalalas   Int              @default(0)
+  payableHalalas        Int              @default(0)
+  billingReferenceId    String?
+  noteReason            String?
+  notes                 String?
+  egsUnitId             String?
+  uuid                  String?          @unique
+  icv                   Int?
+  pih                   String?
+  invoiceHash           String?
+  signedXml             String?          @db.Text
+  clearedXml            String?          @db.Text
+  qrBase64              String?          @db.Text
+  signingTime           DateTime?
+  submissionStatus      SubmissionStatus @default(NOT_SUBMITTED)
+  hasWarnings           Boolean          @default(false)
+  zatcaResponse         Json?
+  submissionAttempts    Int              @default(0)
+  lastAttemptAt         DateTime?
+  /// True when issued on a SIMULATION EGS.
+  isTest                Boolean          @default(false)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  business              Business         @relation(fields: [businessId], references: [id])
+  customer              Customer?        @relation(fields: [customerId], references: [id], onDelete: NoAction)
+  /// NoAction (checked at statement end) so a note and its original can be removed in one deleteMany.
+  billingReference      Document?        @relation("DocumentBillingReference", fields: [billingReferenceId], references: [id], onDelete: NoAction)
+  referencedBy          Document[]       @relation("DocumentBillingReference")
+  egsUnit               EgsUnit?         @relation(fields: [egsUnitId], references: [id])
+  lines                 DocumentLine[]
+
+  @@unique([businessId, kind, sequence])
+  @@index([businessId, createdAt])
+  @@index([customerId])
+  @@index([billingReferenceId])
+}
+
+model DocumentLine {
+  id                  String      @id @default(cuid())
+  documentId          String
+  position            Int
+  description         String
+  descriptionAr       String?
+  /// Up to 6 decimals; the VAT engine works in micro-units.
+  quantity            Decimal     @db.Decimal(18, 6)
+  unitCode            String      @default("PCE")
+  unitPriceHalalas    Int
+  lineDiscountHalalas Int         @default(0)
+  taxCategory         TaxCategory
+  /// Basis points: S = 1500, the others 0.
+  taxRateBp           Int
+  exemptionReasonCode String?
+  exemptionReason     String?
+  netHalalas          Int
+  vatHalalas          Int
+  totalHalalas        Int
+  document            Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, position])
 }

@@ -39,6 +39,7 @@ export function testUsers(prefix: string) {
       const userIds = ids.splice(0);
       // Relation filter, not the raw column: scoping by owner stays in business-context (AC3.6 grep).
       const owned = { owner: { id: { in: userIds } } };
+      await prisma.document.deleteMany({ where: { business: owned } }); // lines cascade
       await prisma.customer.deleteMany({ where: { business: owned } });
       await prisma.egsUnit.deleteMany({ where: { business: owned } });
       await prisma.business.deleteMany({ where: owned });
