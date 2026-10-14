@@ -5,7 +5,7 @@ export { buildUnsignedInvoiceXml } from './xml/ubl-builder';
 export type { ZatcaAddress, ZatcaDocumentInput, ZatcaLineInput, ZatcaParty, ZatcaTaxSubtotal } from './xml/ubl-builder';
 export { computeInvoiceHash, PIH_SEED } from './hash';
 export { signInvoice, verifySignedInvoice, SIGNATURE_INPUT } from './sign';
-export { buildQrTlv, parseQrTlv, ZatcaQrError, type QrFields } from './qr';
+export { buildQrTlv, extractQrFromXml, parseQrTlv, ZatcaQrError, type QrFields } from './qr';
 export { buildCsr, generateKeyPair, type CsrInput, type ZatcaEnvironment } from './csr';
 export { certificateFromToken, certificateInfo } from './certificate';
 export * from './crypto-box';
