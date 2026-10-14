@@ -126,3 +126,16 @@ describe('issue-time rules (findings 7, 10, 11)', () => {
     expect((await row(d.id)).issuedAt!.getTime()).toBeGreaterThanOrEqual(release.getTime());
   });
 });
+
+describe('retryPending time budget (finding 5)', () => {
+  it('starts no new submission once the budget is spent', async () => {
+    const { business } = await setupIssuing(users);
+    const d = await createDraft(business.id);
+    await issuanceService.issueAndSubmit(business.id, d.id, deps(mockGateway({ report: { status: -1 } }).fetchImpl));
+    const gw = mockGateway();
+    const { processed } = await issuanceService.retryPending({ ...deps(gw.fetchImpl), budgetMs: 0 });
+    expect(processed).toBe(0);
+    expect(gw.calls).toHaveLength(0);
+    expect((await row(d.id)).submissionStatus).toBe('PENDING_RETRY');
+  });
+});

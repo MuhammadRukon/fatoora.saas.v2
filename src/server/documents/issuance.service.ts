@@ -28,9 +28,12 @@ export type IssuanceOptions = {
   now?: Date;
   /** Base64 32-byte key; defaults to env.ZATCA_ENCRYPTION_KEY. */
   encryptionKey?: string;
+  /** retryPending only: stop starting new submissions after this many ms (default 45 s, inside the 60 s route limit). */
+  budgetMs?: number;
 };
 
 const MAX_BATCH = 50;
+const CRON_BUDGET_MS = 45_000;
 /** A claimed submission older than this is considered dead (the ZATCA client times out after 30 s). */
 const LEASE_MS = 2 * 60_000;
 const MISSING_CREDENTIALS = 'Missing ZATCA credentials for this unit; re-onboard required';
@@ -352,13 +355,17 @@ export const issuanceService = {
       take: MAX_BATCH,
       select: { id: true },
     });
+    const started = Date.now();
+    let processed = 0;
     for (const d of docs) {
+      if (Date.now() - started >= (opts.budgetMs ?? CRON_BUDGET_MS)) break;
+      processed++;
       try {
         await submit(d.id, opts);
       } catch (err) {
         log.error('zatca.retry_failed', { documentId: d.id, error: err instanceof Error ? err.message : String(err) });
       }
     }
-    return { processed: docs.length };
+    return { processed };
   },
 };
