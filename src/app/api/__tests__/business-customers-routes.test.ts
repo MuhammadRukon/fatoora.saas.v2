@@ -116,7 +116,9 @@ describe('/api/app/customers', () => {
     expect(await (await getCustomer(new Request('http://t'), ctx(id))).json()).toMatchObject({
       name: 'Customer of A',
     });
-    expect((await patchCustomer(json('PATCH', { name: 'Renamed' }), ctx(id))).status).toBe(200);
+    // The form posts its parsed values, so empty optionals arrive as null.
+    const patched = await patchCustomer(json('PATCH', { name: 'Renamed', city: null, buyerIdScheme: null }), ctx(id));
+    expect(patched.status).toBe(200);
     expect((await deleteCustomer(new Request('http://t', { method: 'DELETE' }), ctx(id))).status).toBe(204);
   });
 

@@ -10,8 +10,8 @@ const ARABIC_MESSAGE = 'Must contain Arabic text';
 /** Required, trimmed text. */
 export const text = (max = 200) => z.string().trim().min(1, 'Required').max(max);
 
-/** Optional form field: an empty input or a missing key is stored as null. */
-export const nullable = (schema: z.ZodString) => schema.optional().transform((v) => v || null);
+/** Optional field: empty, null or missing is stored as null (null in: parsed form output round-trips). */
+export const nullable = (schema: z.ZodString) => schema.nullish().transform((v) => v || null);
 
 /** Optional Arabic text: empty, or containing at least one Arabic-script character. */
 export const optionalArabic = nullable(
@@ -21,10 +21,25 @@ export const optionalArabic = nullable(
 export const countryCodeSchema = z
   .string()
   .trim()
+  .toUpperCase()
   .regex(/^[A-Z]{2}$/, 'Two-letter ISO country code, e.g. SA');
 
 /** Letters and digits only (ZATCA rejects other characters in party identifiers). */
 export const ALPHANUMERIC_RE = /^[A-Za-z0-9]*$/;
+
+export const SELLER_ID_SCHEME_LABELS: Record<SellerIdScheme, string> = {
+  CRN: 'Commercial registration (CRN)',
+  MOM: 'MOMRAH license',
+  MLS: 'MHRSD license',
+  S700: '700 number',
+  SAG: 'MISA license',
+  OTH: 'Other ID',
+};
+
+export const ZATCA_ENVIRONMENT_LABELS: Record<ZatcaEnvironment, string> = {
+  SIMULATION: 'Simulation',
+  PRODUCTION: 'Production',
+};
 
 export const businessUpsertSchema = z
   .object({
