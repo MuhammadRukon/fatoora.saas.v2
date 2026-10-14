@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 
 import { auth } from '@/auth';
 import { ForbiddenError, UnauthorizedError, statusFromError, toJsonError } from './errors';
+import { resolveBusinessId } from '@/server/business/business-context';
 import { subscriptionsService } from '@/server/subscriptions/subscriptions.service';
 import { log } from './logger';
 import { RateLimitedError } from './rate-limit';
@@ -53,6 +54,12 @@ export async function requireAppSession(): Promise<{ userId: string }> {
   const user = await requireUserSession();
   await subscriptionsService.assertActive(user.id);
   return { userId: user.id };
+}
+
+/** requireAppSession + the business the request is scoped to (409 BUSINESS_REQUIRED if none). */
+export async function requireBusinessContext(): Promise<{ userId: string; businessId: string }> {
+  const { userId } = await requireAppSession();
+  return { userId, businessId: await resolveBusinessId(userId) };
 }
 
 export function jsonError(err: unknown): NextResponse {

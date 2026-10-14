@@ -58,6 +58,13 @@ export class ConflictError extends AppError {
   }
 }
 
+/** The user has no business profile yet (the app redirects to /app/business?setup=1). */
+export class BusinessRequiredError extends AppError {
+  constructor(message = 'Create your business profile first') {
+    super('BUSINESS_REQUIRED', message);
+  }
+}
+
 export class ValidationError extends AppError {
   constructor(message = 'Validation failed', meta?: Record<string, unknown>) {
     super('VALIDATION_ERROR', message, meta);

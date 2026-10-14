@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AppError,
   BadRequestError,
+  BusinessRequiredError,
   ConflictError,
   ForbiddenError,
   NotFoundError,
@@ -24,6 +25,7 @@ describe('errors: statusFromError', () => {
     expect(statusFromError(new ForbiddenError())).toBe(403);
     expect(statusFromError(new NotFoundError())).toBe(404);
     expect(statusFromError(new ConflictError('dup'))).toBe(409);
+    expect(statusFromError(new BusinessRequiredError())).toBe(409);
     expect(statusFromError(new ValidationError())).toBe(422);
   });
 

@@ -21,6 +21,14 @@ Signup, email verification (verify code, resend), forgot/reset and change-passwo
 | `/api/subscriptions/me` | GET | user | `{state: NONE\|PENDING\|ACTIVE\|EXPIRED, activeUntil, pending}` |
 | `/api/app/ping` | GET | app | gate fixture: `{ok:true}`; every future `/api/app/**` route uses `requireAppSession()` |
 
+## App (user, active subscription, 402 otherwise)
+
+| Route | Methods | Auth | Notes |
+| --- | --- | --- | --- |
+| `/api/app/business` | GET, PUT | app | GET returns the profile or `null`; PUT creates the first time, then updates; 422 on field errors; 409 `BUSINESS_LOCKED_FIELDS` |
+| `/api/app/customers` | GET, POST | app + business | GET `?q=&cursor=&limit=` cursor page; POST 201; 409 `BUSINESS_REQUIRED` before a business exists |
+| `/api/app/customers/[id]` | GET, PATCH, DELETE | app + business | another business's id is 404; DELETE 204; 409 `CUSTOMER_HAS_DOCUMENTS` once documents reference it |
+
 ## Admin
 
 | Route | Methods | Auth | Notes |

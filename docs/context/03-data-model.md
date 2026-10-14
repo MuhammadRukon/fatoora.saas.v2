@@ -13,6 +13,12 @@ Source of truth: [`prisma/schema.prisma`](../../prisma/schema.prisma). PostgreSQ
 ### Infrastructure
 - **RateLimitBucket**: fixed-window counters (`key` PK, `count`, `resetAt`, index on `resetAt`) behind `src/server/common/rate-limit.ts`.
 
+### Business, EGS unit, customers
+- **Business**: the seller. `ownerId` (indexed, not unique: one business per user is enforced in `business.service`), bilingual name/address fields, `vatNumber` char(15), `sellerIdScheme`/`sellerIdValue`, `buildingNumber` char(4), `postalCode` char(5), `countryCode` (default `SA`), `zatcaEnvironment` (default `SIMULATION`). VAT number and environment are locked (`BUSINESS_LOCKED_FIELDS`) once an EGS unit is ACTIVE.
+- **EgsUnit** (schema only until onboarding): per `(businessId, environment)`, encrypted key/CSID columns, `lastIcv`, `lastInvoiceHash` (seeded with the ZATCA PIH). Partial unique index `EgsUnit_one_live_per_business_env` (`WHERE status <> 'REVOKED'`) lives in the migration SQL.
+- **Customer**: scoped by `businessId`; either a VAT number or a buyer ID (scheme + value), never both. Scheme enums map `S700` to the DB value `700`.
+- `resolveBusinessId(userId)` (`src/server/business/business-context.ts`) is the only place a request's business is derived; `BusinessRequiredError` (409 `BUSINESS_REQUIRED`) when none.
+
 ### Subscriptions
 - **Subscription**: `userId` (cascade), `plan` (`MONTH_1 | MONTH_3 | MONTH_6 | MONTH_12`), `status` (`PENDING | ACTIVE`, default `PENDING`), `startsAt`/`endsAt` (null until activated), `activatedAt`, `activatedById` (admin, set null on delete). Index `(userId, status)`.
   - At most one PENDING row per user: partial unique index `Subscription_one_pending_per_user` (`WHERE status = 'PENDING'`), created in the migration SQL because Prisma cannot express it.
