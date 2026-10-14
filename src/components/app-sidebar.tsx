@@ -36,7 +36,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { title: 'Home', url: '/app', icon: IconHome },
-  { title: 'Invoices', icon: IconFileInvoice },
+  { title: 'Invoices', url: '/app/invoices', icon: IconFileInvoice },
   { title: 'Customers', url: '/app/customers', icon: IconUsers },
   { title: 'Business', url: '/app/business', icon: IconBuildingStore },
   { title: 'ZATCA', icon: IconShieldCheck },
