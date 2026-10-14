@@ -22,7 +22,6 @@ import {
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
@@ -30,8 +29,7 @@ import {
 interface NavItem {
   title: string;
   icon: Icon;
-  /** No url: the section ships in a later release and shows as "Soon". */
-  url?: string;
+  url: string;
 }
 
 const NAV: NavItem[] = [
@@ -72,22 +70,12 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
             <SidebarMenu>
               {NAV.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  {item.url ? (
-                    <SidebarMenuButton asChild tooltip={item.title} isActive={isCurrent(pathname, item.url)}>
-                      <Link href={item.url} aria-current={isCurrent(pathname, item.url) ? 'page' : undefined}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  ) : (
-                    <>
-                      <SidebarMenuButton disabled>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </SidebarMenuButton>
-                      <SidebarMenuBadge className="text-muted-foreground">Soon</SidebarMenuBadge>
-                    </>
-                  )}
+                  <SidebarMenuButton asChild tooltip={item.title} isActive={isCurrent(pathname, item.url)}>
+                    <Link href={item.url} aria-current={isCurrent(pathname, item.url) ? 'page' : undefined}>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>

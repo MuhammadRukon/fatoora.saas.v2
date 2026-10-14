@@ -25,7 +25,7 @@ import { useDeleteDocument, useDocument, useDuplicateDocument, useIssueDocument,
 import { DocumentForm } from './document-form';
 import { StatusBadges } from './status-badges';
 
-export function DocumentDetail({ id }: { id: string }) {
+export function DocumentDetail({ id, readOnly = false }: { id: string; readOnly?: boolean }) {
   const { data: doc, isLoading, error } = useDocument(id);
 
   return (
@@ -37,7 +37,7 @@ export function DocumentDetail({ id }: { id: string }) {
         {isLoading ? (
           <Skeleton className="h-8 w-64" />
         ) : doc ? (
-          <DetailHeader doc={doc} />
+          <DetailHeader doc={doc} readOnly={readOnly} />
         ) : (
           <h1 className="text-2xl font-semibold tracking-tight">Document</h1>
         )}
@@ -55,7 +55,9 @@ export function DocumentDetail({ id }: { id: string }) {
           </AlertDescription>
         </Alert>
       ) : doc ? (
-        doc.status === 'DRAFT' ? (
+        doc.status === 'DRAFT' && readOnly ? (
+          <p className="text-muted-foreground">This draft can&apos;t be edited while your subscription is expired.</p>
+        ) : doc.status === 'DRAFT' ? (
           // key: remount with fresh defaults when a copy replaces the view
           <DocumentForm key={doc.id} kind={doc.kind} draft={doc} />
         ) : (
@@ -72,7 +74,7 @@ export function DocumentDetail({ id }: { id: string }) {
   );
 }
 
-function DetailHeader({ doc }: { doc: DocumentDTO }) {
+function DetailHeader({ doc, readOnly }: { doc: DocumentDTO; readOnly: boolean }) {
   const router = useRouter();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const remove = useDeleteDocument(doc.id);
@@ -115,21 +117,23 @@ function DetailHeader({ doc }: { doc: DocumentDTO }) {
             </a>
           </Button>
         ) : null}
-        {doc.submissionStatus === 'PENDING_RETRY' ? (
+        {readOnly ? null : doc.submissionStatus === 'PENDING_RETRY' ? (
           <Button disabled={retry.isPending} onClick={() => retry.mutate()}>
             {retry.isPending ? <Loader /> : <IconRefresh />}
             Retry submission
           </Button>
         ) : null}
-        <Button
-          variant={doc.submissionStatus === 'REJECTED' ? 'default' : 'outline'}
-          disabled={duplicate.isPending}
-          onClick={() => duplicate.mutate(undefined, { onSuccess: (copy) => router.push(`/app/invoices/${copy.id}`) })}
-        >
-          {duplicate.isPending ? <Loader /> : <IconCopy />}
-          {doc.submissionStatus === 'REJECTED' ? 'Create corrected copy' : 'Duplicate as draft'}
-        </Button>
-        {doc.status === 'DRAFT' ? (
+        {readOnly ? null : (
+          <Button
+            variant={doc.submissionStatus === 'REJECTED' ? 'default' : 'outline'}
+            disabled={duplicate.isPending}
+            onClick={() => duplicate.mutate(undefined, { onSuccess: (copy) => router.push(`/app/invoices/${copy.id}`) })}
+          >
+            {duplicate.isPending ? <Loader /> : <IconCopy />}
+            {doc.submissionStatus === 'REJECTED' ? 'Create corrected copy' : 'Duplicate as draft'}
+          </Button>
+        )}
+        {doc.status === 'DRAFT' && !readOnly ? (
           <>
             <Button disabled={issue.isPending} onClick={() => setConfirmIssue(true)}>
               {issue.isPending ? <Loader /> : <IconSend />}

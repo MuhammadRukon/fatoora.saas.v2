@@ -38,10 +38,10 @@ async function upsertUser(email: string, name: string, password: string, role: U
 async function main() {
   await upsertUser(ADMIN_EMAIL, 'Admin', ADMIN_PASSWORD, UserRole.ADMIN);
   console.log('Seed complete.');
-  console.log(`  Admin: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
+  console.log(`  Admin: ${ADMIN_EMAIL}`);
   if (USER_EMAIL && USER_PASSWORD) {
     await upsertUser(USER_EMAIL, 'Demo User', USER_PASSWORD, UserRole.USER);
-    console.log(`  User:  ${USER_EMAIL} / ${USER_PASSWORD}`);
+    console.log(`  User:  ${USER_EMAIL}`);
   }
 }
 

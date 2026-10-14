@@ -209,6 +209,8 @@ model EgsUnit {
   /// Starts at the ZATCA PIH seed: base64(sha256 hex of "0").
   lastInvoiceHash     String           @default("NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==")
   lastError           String?
+  /// Lease taken while an onboarding run is in flight (one run per EGS); cleared when it ends.
+  onboardingSince     DateTime?
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
   business            Business         @relation(fields: [businessId], references: [id])
@@ -352,6 +354,8 @@ model Document {
   lines                 DocumentLine[]
 
   @@unique([businessId, kind, sequence])
+  /// One ICV per EGS chain (NULLs allowed for drafts). The partial index on PENDING_RETRY documents lives in the migration SQL only.
+  @@unique([egsUnitId, icv])
   @@index([businessId, createdAt])
   @@index([customerId])
   @@index([billingReferenceId])

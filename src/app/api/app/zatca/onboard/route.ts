@@ -5,6 +5,9 @@ import { jsonError, requireBusinessContext } from '@/server/common/http';
 import { enforceRateLimit } from '@/server/common/rate-limit';
 import { onboardingService } from '@/server/zatca-onboarding/onboarding.service';
 
+// ZATCA calls can take up to 30 s each; the Vercel default would cut the request mid-submission.
+export const maxDuration = 60;
+
 // Each attempt spends a real ZATCA OTP, so cap them per business.
 const ONBOARD_LIMIT = { max: 5, windowMs: 60 * 60 * 1000 };
 

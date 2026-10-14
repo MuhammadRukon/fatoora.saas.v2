@@ -50,26 +50,38 @@ describe('businessService.upsertMine', () => {
     expect(await countOwned(user.id)).toBe(1);
   });
 
-  it('locks VAT number and environment once an EGS unit is ACTIVE', async () => {
-    const user = await users.create();
-    const business = await upsert(user.id);
-    await prisma.egsUnit.create({
+  const activeEgs = (businessId: string, environment: 'SIMULATION' | 'PRODUCTION') =>
+    prisma.egsUnit.create({
       data: {
-        businessId: business.id,
-        environment: 'SIMULATION',
+        businessId,
+        environment,
         serialNumber: `1-Fatoora|2-v2|3-${crypto.randomUUID()}`,
         commonName: 'test-egs',
         status: 'ACTIVE',
       },
     });
 
-    for (const change of [{ vatNumber: '310000000000003' }, { zatcaEnvironment: 'PRODUCTION' as const }]) {
-      const err = await upsert(user.id, change).catch((e) => e);
-      expect(err).toBeInstanceOf(ConflictError);
-      expect(err.message).toContain('BUSINESS_LOCKED_FIELDS');
-    }
+  it('locks the VAT number once any EGS unit is ACTIVE, but allows switching to an environment with none', async () => {
+    const user = await users.create();
+    const business = await upsert(user.id);
+    await activeEgs(business.id, 'SIMULATION');
+
+    const err = await upsert(user.id, { vatNumber: '310000000000003' }).catch((e) => e);
+    expect(err).toBeInstanceOf(ConflictError);
+    expect(err.message).toContain('BUSINESS_LOCKED_FIELDS');
+    expect(await upsert(user.id, { zatcaEnvironment: 'PRODUCTION' })).toMatchObject({ zatcaEnvironment: 'PRODUCTION' });
     // Other fields stay editable.
     expect(await upsert(user.id, { nameEn: 'Still Editable' })).toMatchObject({ nameEn: 'Still Editable' });
+  });
+
+  it('locks the environment switch when the target environment already has an ACTIVE EGS', async () => {
+    const user = await users.create();
+    const business = await upsert(user.id);
+    await activeEgs(business.id, 'SIMULATION');
+    await activeEgs(business.id, 'PRODUCTION');
+    const err = await upsert(user.id, { zatcaEnvironment: 'PRODUCTION' }).catch((e) => e);
+    expect(err).toBeInstanceOf(ConflictError);
+    expect(err.message).toContain('BUSINESS_LOCKED_FIELDS');
   });
 
   it('allows changing VAT number and environment before any EGS unit is ACTIVE', async () => {

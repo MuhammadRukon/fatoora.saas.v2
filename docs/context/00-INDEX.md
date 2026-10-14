@@ -24,7 +24,7 @@ Fast orientation for AI assistants and human contributors. Read `01-overview.md`
 
 ## Quick facts
 
-- **Product**: "Fatoora", a multi-tenant ZATCA Phase 2 e-invoicing SaaS for Saudi businesses. Users sign up, request a plan (no payment), an admin activates it, then they issue invoices and credit/debit notes reported to or cleared by ZATCA. The phases after Phase 1 build this; today the app is auth, admin users and the shell.
+- **Product**: "Fatoora", a multi-tenant ZATCA Phase 2 e-invoicing SaaS for Saudi businesses. Users sign up, request a plan (no payment), an admin activates it, then they issue invoices and credit/debit notes reported to or cleared by ZATCA. Phases 1-7 are built and merged: auth, plan requests and admin activation, business and customers, document drafts, ZATCA onboarding and the issuance pipeline (sign, chain, report or clear, retry). The live ZATCA Simulation gate (AC6.4/AC7.11) is still pending.
 - **Stack**: Next.js 16 (App Router, Turbopack dev) + React 19 + TypeScript, Prisma + PostgreSQL, Auth.js v5 (JWT), TanStack Query, Tailwind v4 + shadcn/ui, Vitest.
 - **Hosting**: Vercel (frontend + API), Prisma-hosted Postgres, optional Upstash Redis (limiter, fail-open). Cost-sensitive: prefer DB-based or free-tier solutions.
 - **Roles**: `USER` and `ADMIN` only.

@@ -15,7 +15,7 @@ Rules of thumb:
 
 - Only `src/server/common/http.ts` imports `next/server` in server-layer code.
 - Money is always integer halalas; use `src/server/common/money.ts` (`toHalalas`, `fromHalalas`, `formatSAR`).
-- Slugs via `src/server/common/slug.ts`; pagination via `src/server/common/pagination.ts`.
+- Pagination via `src/server/common/pagination.ts`.
 - Multi-step DB writes go inside `prisma.$transaction` and pass the `tx` client to any helper called within.
 - Every business-domain query is scoped by `businessId`; ownership is checked server-side on every route.
 - Redis is fail-open: never make correctness depend on a cache hit, and never put emails, IPs or other PII in a key or value.

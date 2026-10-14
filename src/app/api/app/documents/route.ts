@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server';
 
 import { documentDraftSchema, documentListQuerySchema } from '@/contracts/documents';
 import { documentsService } from '@/server/documents/documents.service';
-import { jsonError, requireBusinessContext } from '@/server/common/http';
+import { jsonError, requireBusinessContext, requireBusinessReadContext } from '@/server/common/http';
 
 export async function GET(request: Request) {
   try {
-    const { businessId } = await requireBusinessContext();
+    const { businessId } = await requireBusinessReadContext();
     const query = documentListQuerySchema.parse(Object.fromEntries(new URL(request.url).searchParams));
     return NextResponse.json(await documentsService.list(businessId, query));
   } catch (err) {

@@ -98,3 +98,14 @@ describe('buildUnsignedInvoiceXml', () => {
     ).toThrow();
   });
 });
+
+describe('buildUnsignedInvoiceXml control characters (finding 13)', () => {
+  it('refuses characters that are illegal in XML 1.0 instead of emitting a broken document', () => {
+    const bad = structuredClone(simplifiedInvoice);
+    bad.lines[0].name = 'Wid\u0001get';
+    expect(() => buildUnsignedInvoiceXml(bad)).toThrow(/control character/);
+    const ok = structuredClone(simplifiedInvoice);
+    ok.lines[0].name = 'Widget\twith tab';
+    expect(() => buildUnsignedInvoiceXml(ok)).not.toThrow();
+  });
+});

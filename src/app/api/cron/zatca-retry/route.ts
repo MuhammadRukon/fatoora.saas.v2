@@ -5,6 +5,9 @@ import { env } from '@/env';
 import { issuanceService } from '@/server/documents/issuance.service';
 import { jsonError } from '@/server/common/http';
 
+// ZATCA calls can take up to 30 s each; the Vercel default would cut the request mid-submission.
+export const maxDuration = 60;
+
 // Not under /api/app: no session, only the shared secret Vercel Cron sends as a Bearer token.
 function authorized(request: Request) {
   const secret = env.CRON_SECRET;

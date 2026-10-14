@@ -37,6 +37,15 @@ const schema = z
   .refine((e) => e.NODE_ENV !== 'production' || !!e.CRON_SECRET, {
     message: 'CRON_SECRET is required in production',
     path: ['CRON_SECRET'],
+  })
+  // Without a mailer, verification secrets would have nowhere to go; fail at boot instead.
+  .refine((e) => e.NODE_ENV !== 'production' || !!e.RESEND_API_KEY, {
+    message: 'RESEND_API_KEY is required in production',
+    path: ['RESEND_API_KEY'],
+  })
+  .refine((e) => e.NODE_ENV !== 'production' || !!e.EMAIL_FROM, {
+    message: 'EMAIL_FROM is required in production',
+    path: ['EMAIL_FROM'],
   });
 
 export const env = schema.parse(process.env);

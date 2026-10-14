@@ -1,17 +1,25 @@
+import Link from 'next/link';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { auth } from '@/auth';
 import { AppSidebar } from '@/components/app-sidebar';
 import { SiteHeader } from '@/components/site-header';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { isReadOnlyAppPath } from '@/lib/app-access';
 import { subscriptionsService } from '@/server/subscriptions/subscriptions.service';
 
-/** Subscription gate for every /app page (anything but ACTIVE goes to /plans), plus the app shell. */
+/**
+ * Subscription gate for every /app page (anything but ACTIVE goes to /plans), plus the app shell.
+ * Exception: an EXPIRED subscription may open the invoice list, detail and print pages read-only.
+ */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session?.user) redirect('/login'); // the (app) group layout already checked the role
   const { state } = await subscriptionsService.getState(session.user.id);
-  if (state !== 'ACTIVE') redirect('/plans');
+  const readOnly = state === 'EXPIRED' && isReadOnlyAppPath((await headers()).get('x-pathname'));
+  if (state !== 'ACTIVE' && !readOnly) redirect('/plans');
 
   return (
     <SidebarProvider
@@ -33,7 +41,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* min-w-0: wide tables scroll inside their container, not the page */}
       <SidebarInset className="min-w-0">
         <SiteHeader />
-        <div className="flex-1 p-4 md:p-8">{children}</div>
+        <div className="flex-1 p-4 md:p-8">
+          {readOnly ? (
+            <Alert className="mb-6">
+              <AlertDescription>
+                Subscription expired: read-only,{' '}
+                <Link href="/plans" className="font-medium underline underline-offset-4">
+                  renew at /plans
+                </Link>
+                .
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          {children}
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );

@@ -2,6 +2,14 @@ import { z } from 'zod';
 
 import { ERROR_CODES } from './errors';
 
+/** Characters XML 1.0 forbids (tab, LF and CR are legal): they would make a signed invoice unparseable. */
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/;
+export const noControlChars = (v: string) => !CONTROL_CHARS_RE.test(v);
+/** For single-line fields: also no CR/LF. */
+export const singleLine = (v: string) => noControlChars(v) && !/[\r\n]/.test(v);
+export const INVALID_CHARS_MESSAGE = 'Contains invalid characters';
+
 export const idSchema = z.string().min(1);
 
 export const paginationQuerySchema = z.object({

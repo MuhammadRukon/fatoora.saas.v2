@@ -195,3 +195,28 @@ describe('onboardingService.getStatus', () => {
     for (const bad of ['privateKey', 'secret', 'BEGIN', 'v1:']) expect(json).not.toContain(bad);
   });
 });
+
+describe('onboardingService.onboard concurrency (finding 9)', () => {
+  it('a second concurrent call gets 409 ONBOARDING_IN_PROGRESS and never overwrites the key', async () => {
+    const business = await setup();
+    const slow = mockFetch();
+    const gate = new Promise<void>((r) => setTimeout(r, 300));
+    const delayed = (async (...a: Parameters<typeof fetch>) => {
+      await gate;
+      return slow.impl(...a);
+    }) as typeof fetch;
+
+    const results = await Promise.allSettled([
+      onboardingService.onboard(business.id, '111111', deps(delayed)),
+      onboardingService.onboard(business.id, '222222', deps(delayed)),
+    ]);
+    const ok = results.filter((r) => r.status === 'fulfilled');
+    const bad = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    expect(ok).toHaveLength(1);
+    expect(bad).toHaveLength(1);
+    expect(bad[0].reason).toMatchObject({ code: 'CONFLICT', meta: { code: 'ONBOARDING_IN_PROGRESS' } });
+    expect(slow.calls.filter((c) => c.path === '/compliance')).toHaveLength(1);
+    expect(await prisma.egsUnit.count({ where: { businessId: business.id } })).toBe(1);
+    expect(await egsOf(business.id)).toMatchObject({ status: 'ACTIVE', onboardingSince: null });
+  });
+});

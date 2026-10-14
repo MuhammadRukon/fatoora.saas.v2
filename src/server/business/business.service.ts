@@ -19,13 +19,19 @@ export const businessService = {
       });
       if (!existing) return tx.business.create({ data: { ...data, ownerId: userId } });
 
-      const changesLocked =
-        data.vatNumber !== existing.vatNumber ||
-        (data.zatcaEnvironment !== undefined && data.zatcaEnvironment !== existing.zatcaEnvironment);
-      // Onboarded EGS certificates are bound to the VAT number and the ZATCA environment.
-      if (changesLocked) {
-        const activeEgs = await tx.egsUnit.count({ where: { businessId: existing.id, status: 'ACTIVE' } });
-        if (activeEgs) {
+      // An onboarded certificate is bound to the VAT number, so any ACTIVE EGS locks it. The environment may
+      // change freely unless the target environment already has an ACTIVE EGS.
+      const vatChanged = data.vatNumber !== existing.vatNumber;
+      const envChanged = data.zatcaEnvironment !== undefined && data.zatcaEnvironment !== existing.zatcaEnvironment;
+      if (vatChanged || envChanged) {
+        const locked = await tx.egsUnit.count({
+          where: {
+            businessId: existing.id,
+            status: 'ACTIVE',
+            ...(vatChanged ? {} : { environment: data.zatcaEnvironment }),
+          },
+        });
+        if (locked) {
           throw new ConflictError(
             'VAT number and ZATCA environment are locked after onboarding (BUSINESS_LOCKED_FIELDS)',
           );

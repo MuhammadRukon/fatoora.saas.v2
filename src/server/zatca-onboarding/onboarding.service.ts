@@ -50,6 +50,8 @@ export type OnboardResult = {
 };
 
 const MAX_ERROR_CHARS = 2000;
+/** A claimed onboarding older than this is considered dead (up to 8 ZATCA calls of 30 s each). */
+const LEASE_MS = 5 * 60_000;
 const field = (body: unknown, key: string): string | undefined => {
   const v = body && typeof body === 'object' ? (body as Record<string, unknown>)[key] : undefined;
   return typeof v === 'string' || typeof v === 'number' ? String(v) : undefined;
@@ -101,15 +103,29 @@ export const onboardingService = {
     if (!business) throw new NotFoundError('Business');
     const environment = business.zatcaEnvironment;
 
-    let egs = await prisma.egsUnit.findFirst({ where: { businessId, environment, status: { not: 'REVOKED' } } });
-    if (egs?.status === 'ACTIVE') throw new ConflictError('This EGS unit is already onboarded');
-    egs ??= await prisma.egsUnit.create({
-      data: {
-        businessId,
-        environment,
-        serialNumber: `1-Fatoora|2-v2|3-${randomUUID()}`,
-        commonName: `${business.nameEn}-EGS`,
-      },
+    // Claim the unit: find-or-create plus the lease are atomic under a per-business advisory lock, and a second concurrent
+    // run is refused (409) instead of overwriting the key. The network calls below run outside this transaction.
+    const inProgress = () =>
+      new ConflictError('An onboarding run is already in progress (ONBOARDING_IN_PROGRESS)', { code: 'ONBOARDING_IN_PROGRESS' });
+    let egs = await prisma.$transaction(async (tx) => {
+      const [{ locked }] = await tx.$queryRaw<{ locked: boolean }[]>`
+        SELECT pg_try_advisory_xact_lock(hashtext(${`onboard:${businessId}:${environment}`})) AS locked`;
+      if (!locked) throw inProgress();
+      const found = await tx.egsUnit.findFirst({ where: { businessId, environment, status: { not: 'REVOKED' } } });
+      if (found?.status === 'ACTIVE') throw new ConflictError('This EGS unit is already onboarded');
+      if (found?.onboardingSince && found.onboardingSince.getTime() > Date.now() - LEASE_MS) throw inProgress();
+      const onboardingSince = new Date();
+      return found
+        ? tx.egsUnit.update({ where: { id: found.id }, data: { onboardingSince } })
+        : tx.egsUnit.create({
+            data: {
+              businessId,
+              environment,
+              serialNumber: `1-Fatoora|2-v2|3-${randomUUID()}`,
+              commonName: `${business.nameEn}-EGS`,
+              onboardingSince,
+            },
+          });
     });
     const id = egs.id;
     const update = (data: Partial<EgsUnit>) => prisma.egsUnit.update({ where: { id }, data });
@@ -235,6 +251,8 @@ export const onboardingService = {
       log.error('zatca.onboard_failed', { businessId, error: err instanceof Error ? err.message : String(err) });
       await update({ status: 'FAILED', lastError: 'Onboarding failed unexpectedly; request a new OTP and try again' });
       throw err;
+    } finally {
+      await prisma.egsUnit.updateMany({ where: { id }, data: { onboardingSince: null } });
     }
   },
 };

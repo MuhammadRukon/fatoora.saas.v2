@@ -88,7 +88,7 @@ export const documentDraftSchema = z
     lines: z.array(documentLineSchema).min(1, 'Add at least one line').max(MAX_LINES),
     billingReferenceId: nullable(z.string().trim().max(60)),
     noteReason: nullable(z.string().trim().max(300)),
-    notes: nullable(z.string().trim().max(1000)),
+    notes: nullable(z.string().trim().max(1000), true),
   })
   .superRefine((d, ctx) => {
     const need = (path: string, ok: unknown, message = 'Required') =>

@@ -111,7 +111,7 @@ export default function SignupPage() {
                   <Input
                     type="tel"
                     autoComplete="tel"
-                    placeholder="+8801XXXXXXXXX"
+                    placeholder="+9665XXXXXXXX"
                     {...field}
                     value={field.value ?? ''}
                   />

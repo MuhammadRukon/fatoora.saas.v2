@@ -277,7 +277,21 @@ export const documentsService = {
     }
     const rows = await prisma.document.findMany({
       where,
-      include: { customer: { select: { name: true } } },
+      // Explicit columns: the XML, QR and ZATCA response blobs must not be loaded for every row of a list.
+      select: {
+        id: true,
+        kind: true,
+        subtype: true,
+        status: true,
+        number: true,
+        buyerSnapshot: true,
+        issueDate: true,
+        createdAt: true,
+        payableHalalas: true,
+        submissionStatus: true,
+        isTest: true,
+        customer: { select: { name: true } },
+      },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: take + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),

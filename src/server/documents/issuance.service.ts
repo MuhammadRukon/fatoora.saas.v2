@@ -12,6 +12,7 @@ import {
   extractQrFromXml,
   redactHeaders,
   signInvoice,
+  riyadhDisplay,
   toZatcaDateTime,
   buildUnsignedInvoiceXml,
   type ZatcaAuth,
@@ -27,11 +28,15 @@ export type IssuanceOptions = {
   now?: Date;
   /** Base64 32-byte key; defaults to env.ZATCA_ENCRYPTION_KEY. */
   encryptionKey?: string;
+  /** retryPending only: stop starting new submissions after this many ms (default 45 s, inside the 60 s route limit). */
+  budgetMs?: number;
 };
 
 const MAX_BATCH = 50;
+const CRON_BUDGET_MS = 45_000;
 /** A claimed submission older than this is considered dead (the ZATCA client times out after 30 s). */
 const LEASE_MS = 2 * 60_000;
+const MISSING_CREDENTIALS = 'Missing ZATCA credentials for this unit; re-onboard required';
 const AUTH_ERROR_PREFIX = 'ZATCA rejected the credentials';
 
 const dayString = (d: Date | null) => d?.toISOString().slice(0, 10) ?? null;
@@ -61,7 +66,6 @@ export function missingBuyerFields(buyer: PartySnapshot | null): string[] {
  * Returns the document id; nothing here touches the network (the signed XML is stored before any submission).
  */
 async function issue(businessId: string, documentId: string, opts: IssuanceOptions = {}): Promise<string> {
-  const now = opts.now ?? new Date();
   const key = opts.encryptionKey ?? env.ZATCA_ENCRYPTION_KEY;
 
   return prisma.$transaction(
@@ -80,6 +84,12 @@ async function issue(businessId: string, documentId: string, opts: IssuanceOptio
       if (!locked.length) throw notOnboarded();
       const egs = await tx.egsUnit.findUniqueOrThrow({ where: { id: locked[0].id } });
       if (!egs.privateKeyEnc || !egs.certificatePem) throw notOnboarded();
+
+      // Taken after the lock: queued issues must not stamp a time earlier than the chain predecessor's.
+      const now = opts.now ?? new Date();
+      if (egs.certNotAfter && egs.certNotAfter < now) {
+        throw new ConflictError('The EGS certificate has expired; onboard again (ZATCA_CERT_EXPIRED)', { code: 'ZATCA_CERT_EXPIRED' });
+      }
 
       // 2. Lock the document.
       const own = await tx.$queryRaw<{ id: string }[]>`
@@ -117,7 +127,7 @@ async function issue(businessId: string, documentId: string, opts: IssuanceOptio
         }
         billingReferenceNumber = original.number;
       }
-      if (doc.supplyDate && dayString(doc.supplyDate)! > issueDate) {
+      if (doc.supplyDate && dayString(doc.supplyDate)! > riyadhDisplay(now).slice(0, 10)) {
         throw new ValidationError('The supply date cannot be after the issue date (SUPPLY_DATE_IN_FUTURE)', { code: 'SUPPLY_DATE_IN_FUTURE' });
       }
 
@@ -225,6 +235,9 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
     const egs: EgsUnit | null = doc.egsUnit;
     if (!egs?.productionCsidEnc || !egs.productionSecretEnc || !doc.signedXml || !doc.uuid || !doc.invoiceHash) {
       log.error('zatca.submit_missing_credentials', { documentId });
+      // Visible on the ZATCA page, and the attempt time moves the document to the back of the retry queue.
+      if (egs) await prisma.egsUnit.update({ where: { id: egs.id }, data: { lastError: MISSING_CREDENTIALS } });
+      await prisma.document.update({ where: { id: documentId }, data: { lastAttemptAt: now } });
       return;
     }
     const auth: ZatcaAuth = {
@@ -265,6 +278,21 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
         const qr = extractQrFromXml(clearedXml);
         if (qr) data.qrBase64 = qr;
       }
+    } else if (res.outcome === 'DUPLICATE') {
+      // ASSUMPTION (see client.ts): ZATCA already has this document. A reported one is done; a cleared one lost its
+      // response, and the cleared XML cannot be re-fetched, so it stays pending with a note. Confirm at the Simulation gate.
+      data.zatcaResponse = {
+        httpStatus: res.httpStatus,
+        outcome: res.outcome,
+        ...storedBody,
+        submissionNote: cleared
+          ? 'ZATCA reports this document already cleared; clearance XML unavailable, check the Fatoora portal'
+          : 'ZATCA reports this document already received; confirm in the Fatoora portal',
+      } as Prisma.InputJsonValue;
+      if (!cleared) {
+        data.submissionStatus = 'REPORTED';
+        data.hasWarnings = true;
+      }
     } else if (res.outcome === 'REJECTED') {
       data.submissionStatus = 'REJECTED';
     } else if (res.outcome === 'AUTH_ERROR') {
@@ -273,7 +301,18 @@ async function submit(documentId: string, opts: IssuanceOptions = {}): Promise<v
         data: { lastError: `${AUTH_ERROR_PREFIX} (HTTP ${res.httpStatus}); re-onboard required` },
       });
     }
-    await prisma.document.update({ where: { id: documentId }, data });
+    try {
+      await prisma.document.update({ where: { id: documentId }, data });
+    } catch (err) {
+      // ZATCA has answered but the outcome was not saved: retry once; a resubmission would later answer DUPLICATE.
+      log.error('zatca.outcome_write_failed', { documentId, error: err instanceof Error ? err.message : String(err) });
+      try {
+        await prisma.document.update({ where: { id: documentId }, data });
+      } catch (err2) {
+        log.error('zatca.outcome_lost', { documentId, httpStatus: res.httpStatus, outcome: res.outcome, error: err2 instanceof Error ? err2.message : String(err2) });
+        throw err2;
+      }
+    }
     if (res.outcome === 'PASS' || res.outcome === 'WARNING' || res.outcome === 'REJECTED') {
       // The credentials worked, so a stale auth failure no longer applies.
       await prisma.egsUnit.updateMany({ where: { id: egs.id, lastError: { startsWith: AUTH_ERROR_PREFIX } }, data: { lastError: null } });
@@ -307,21 +346,26 @@ export const issuanceService = {
     await submit(documentId, opts);
   },
 
-  /** Cron: the oldest PENDING_RETRY documents first, one at a time. */
+  /** Cron: PENDING_RETRY documents, least recently attempted first, one at a time. */
   async retryPending(opts: IssuanceOptions = {}) {
     const docs = await prisma.document.findMany({
       where: { status: 'ISSUED', submissionStatus: 'PENDING_RETRY' },
-      orderBy: { issuedAt: 'asc' },
+      // Least recently attempted first (never-tried on top), so a permanently failing document cannot hold the head of the queue.
+      orderBy: [{ lastAttemptAt: { sort: 'asc', nulls: 'first' } }, { issuedAt: 'asc' }],
       take: MAX_BATCH,
       select: { id: true },
     });
+    const started = Date.now();
+    let processed = 0;
     for (const d of docs) {
+      if (Date.now() - started >= (opts.budgetMs ?? CRON_BUDGET_MS)) break;
+      processed++;
       try {
         await submit(d.id, opts);
       } catch (err) {
         log.error('zatca.retry_failed', { documentId: d.id, error: err instanceof Error ? err.message : String(err) });
       }
     }
-    return { processed: docs.length };
+    return { processed };
   },
 };

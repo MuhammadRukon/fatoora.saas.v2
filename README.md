@@ -2,7 +2,7 @@
 
 A multi-tenant ZATCA Phase 2 e-invoicing SaaS for businesses in Saudi Arabia. Users sign up, verify their email and request a plan (no payment); an admin activates it. They then set up their business, onboard an EGS unit with ZATCA, manage customers, and issue standard and simplified invoices and credit/debit notes that are signed, hash-chained and reported to or cleared by ZATCA.
 
-The build is phased; see [`docs/plans/fatoora-saas-v2-plan.md`](./docs/plans/fatoora-saas-v2-plan.md). Today the app has auth (signup, email verification, login, password reset), the admin dashboard shell and admin user management.
+The build is phased; see [`docs/plans/fatoora-saas-v2-plan.md`](./docs/plans/fatoora-saas-v2-plan.md). Phases 1-7 are built: auth, plan requests with admin activation, business and customers, documents, ZATCA onboarding and the issuance pipeline; the live ZATCA Simulation gate is still pending.
 
 **Full documentation lives in [`docs/`](./docs/context/00-INDEX.md)**: architecture, data model, API reference, known issues.
 

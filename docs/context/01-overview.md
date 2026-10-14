@@ -4,7 +4,7 @@
 
 **Fatoora**: a multi-tenant ZATCA Phase 2 e-invoicing SaaS. A user signs up and verifies their email, requests a plan (1, 3, 6 or 12 months; no payment), and an admin activates it. The user then sets up a business profile, onboards an EGS unit with ZATCA (Simulation or Production), manages customers, and issues standard (B2B) and simplified (B2C) invoices plus credit/debit notes that are signed, hash-chained, carry a QR, and are reported to or cleared by ZATCA.
 
-Current state (after plan Phase 2): auth (signup, email verification, login, password reset), plan requests (`/plans`) with manual admin activation, the subscription-gated `/app` area (placeholder home), and the admin dashboard (counts, users with subscription state). Businesses, documents and ZATCA arrive in later phases of [`docs/plans/fatoora-saas-v2-plan.md`](../plans/fatoora-saas-v2-plan.md).
+Current state (after plan Phase 7): auth (signup, email verification, login, password reset), plan requests (`/plans`) with manual admin activation, the subscription-gated `/app` area (business profile, customers, documents, ZATCA onboarding and issuance with a retry cron), and the admin dashboard. The live ZATCA Simulation gate (AC6.4/AC7.11) is still pending; see [`docs/plans/fatoora-saas-v2-plan.md`](../plans/fatoora-saas-v2-plan.md).
 
 ## Tech stack
 
@@ -35,7 +35,7 @@ Local values live in `.env.dev` (gitignored); copy `.env.example` to `.env.dev` 
 
 | Group | Variables |
 | --- | --- |
-| App | `APP_NAME`, `APP_DEFAULT_FROM_EMAIL`, `NEXT_PUBLIC_APP_URL` (required) |
+| App | `NEXT_PUBLIC_APP_URL` (required) |
 | Database | `DATABASE_URL` (required), `SHADOW_DATABASE_URL` (only for `prisma migrate dev`) |
 | Auth | `NEXTAUTH_URL`, `NEXTAUTH_SECRET` (required), `AUTH_TRUST_HOST`, optional `AUTH_SECRET` (fallback read in `src/proxy.ts`) |
 | ZATCA | `ZATCA_ENCRYPTION_KEY` (required; base64 of exactly 32 bytes, AES-256-GCM key for ZATCA secrets and private keys) |

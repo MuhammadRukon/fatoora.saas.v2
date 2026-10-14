@@ -41,13 +41,27 @@ describe('env: CRON_SECRET', () => {
 
   it('is required in production', async () => {
     await expect(
-      loadEnv({ ZATCA_ENCRYPTION_KEY: KEY_32, NODE_ENV: 'production', CRON_SECRET: undefined }),
+      loadEnv({ ZATCA_ENCRYPTION_KEY: KEY_32, NODE_ENV: 'production', CRON_SECRET: undefined, RESEND_API_KEY: 'k', EMAIL_FROM: 'a@b.sa' }),
     ).rejects.toThrow(/CRON_SECRET/);
     const { env } = await loadEnv({
       ZATCA_ENCRYPTION_KEY: KEY_32,
       NODE_ENV: 'production',
       CRON_SECRET: 'c',
+      RESEND_API_KEY: 'k',
+      EMAIL_FROM: 'a@b.sa',
     });
     expect(env.CRON_SECRET).toBe('c');
+  });
+});
+
+describe('env: mailer', () => {
+  it('requires RESEND_API_KEY and EMAIL_FROM in production only', async () => {
+    const base = { ZATCA_ENCRYPTION_KEY: KEY_32, CRON_SECRET: 'c' };
+    await expect(loadEnv({ ...base, NODE_ENV: 'production', RESEND_API_KEY: undefined, EMAIL_FROM: undefined })).rejects.toThrow(
+      /RESEND_API_KEY/,
+    );
+    await expect(loadEnv({ ...base, NODE_ENV: 'production', RESEND_API_KEY: 'k', EMAIL_FROM: undefined })).rejects.toThrow(/EMAIL_FROM/);
+    await loadEnv({ ...base, NODE_ENV: 'production', RESEND_API_KEY: 'k', EMAIL_FROM: 'a@b.sa' });
+    await loadEnv({ ...base, NODE_ENV: 'development', RESEND_API_KEY: undefined, EMAIL_FROM: undefined });
   });
 });
