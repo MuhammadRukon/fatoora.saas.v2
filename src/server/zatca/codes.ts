@@ -44,12 +44,3 @@ export const VATEX_REASONS: Record<string, { category: TaxCategoryCode; text: st
   // Reason text is free text supplied by the taxpayer.
   'VATEX-SA-OOS': { category: 'O', text: '' },
 };
-
-// UNTDID 4461 subset used by the app
-export const PAYMENT_MEANS = { INSTRUMENT_NOT_DEFINED: '1', CASH: '10', CREDIT: '30', BANK_ACCOUNT: '42', BANK_CARD: '48' } as const;
-
-// BT-29-1 (seller) and BT-46-1 (buyer) scheme ids, BR-KSA-08 / BR-KSA-14
-export const SELLER_ID_SCHEMES = ['CRN', 'MOM', 'MLS', '700', 'SAG', 'OTH'] as const;
-export const BUYER_ID_SCHEMES = ['TIN', 'CRN', 'MOM', 'MLS', '700', 'SAG', 'NAT', 'GCC', 'IQA', 'PAS', 'OTH'] as const;
-export type SellerIdScheme = (typeof SELLER_ID_SCHEMES)[number];
-export type BuyerIdScheme = (typeof BUYER_ID_SCHEMES)[number];

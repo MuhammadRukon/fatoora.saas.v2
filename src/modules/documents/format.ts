@@ -6,9 +6,6 @@ const group = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximum
 /** "1,234.56": Latin digits and exactly 2 decimals, for lists, forms and the print view. */
 export const formatAmount = (halalas: number) => group.format(Number(fromHalalas(halalas)));
 
-/** Display name of a document: its number, or "Draft" before issue. */
-export const documentLabel = (d: { number: string | null }) => d.number ?? 'Draft';
-
 /**
  * Printing rules: simplified documents once issued, standard ones only after ZATCA cleared them (the buyer must not
  * receive an uncleared standard invoice). Drafts stay printable as a watermarked preview.

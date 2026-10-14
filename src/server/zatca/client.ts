@@ -14,8 +14,8 @@ export type ZatcaOutcome =
 
 export type ZatcaResponse = { httpStatus: number; body: unknown; outcome: ZatcaOutcome };
 export type ZatcaAuth = { binarySecurityToken: string; secret: string };
-export type ZatcaInvoicePayload = { invoiceHash: string; uuid: string; invoice: string };
-export type ZatcaLogEntry = {
+type ZatcaInvoicePayload = { invoiceHash: string; uuid: string; invoice: string };
+type ZatcaLogEntry = {
   method: string;
   url: string;
   headers: Record<string, string>;
@@ -102,8 +102,6 @@ export function createZatcaClient(env: ZatcaEnvironment, fetchImpl: typeof fetch
       post('/invoices/clearance/single', p, { ...basic(a), 'Clearance-Status': '1' }),
   };
 }
-
-export type ZatcaClient = ReturnType<typeof createZatcaClient>;
 
 const asRecord = (v: unknown): Record<string, unknown> =>
   v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};

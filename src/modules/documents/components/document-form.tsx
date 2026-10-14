@@ -64,7 +64,7 @@ const emptyDraft = (kind: DocumentKind): DocumentDraftInput => ({
 });
 
 /** The stored draft as form values (amounts stay halalas, empty optionals become ''). */
-export const draftToForm = (d: DocumentDTO): DocumentDraftInput => ({
+const draftToForm = (d: DocumentDTO): DocumentDraftInput => ({
   kind: d.kind,
   subtype: d.subtype,
   customerId: d.customerId ?? '',

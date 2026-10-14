@@ -10,7 +10,7 @@ interface DocumentPage {
   nextCursor: string | null;
 }
 
-export type DocumentFilters = Pick<DocumentListQuery, 'kind' | 'status' | 'submissionStatus' | 'q'>;
+type DocumentFilters = Pick<DocumentListQuery, 'kind' | 'status' | 'submissionStatus' | 'q'>;
 
 const errorToast = (fallback: string) => (err: unknown) =>
   toast.error(err instanceof ApiClientError ? err.message : fallback);

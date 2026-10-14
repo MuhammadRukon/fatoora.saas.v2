@@ -44,7 +44,7 @@ const lockFailure = () =>
   new ConflictError('Issued documents cannot be changed (DOCUMENT_IMMUTABLE)', { code: 'DOCUMENT_IMMUTABLE' });
 
 /** Missing fields a STANDARD invoice needs on its buyer (plan step 1.3), in form order. */
-export function missingBuyerFields(buyer: PartySnapshot | null): string[] {
+function missingBuyerFields(buyer: PartySnapshot | null): string[] {
   if (!buyer) return ['name', 'vatNumber', 'buildingNumber', 'postalCode', 'district', 'street', 'city'];
   const a = buyer.address;
   const missing: string[] = [];

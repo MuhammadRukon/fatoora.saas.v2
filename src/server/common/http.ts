@@ -57,7 +57,7 @@ export async function requireAppSession(): Promise<{ userId: string }> {
 }
 
 /** Gate for GET-only routes over already-issued records: also lets an EXPIRED subscription read. */
-export async function requireAppReadSession(): Promise<{ userId: string }> {
+async function requireAppReadSession(): Promise<{ userId: string }> {
   const user = await requireUserSession();
   await subscriptionsService.assertReadable(user.id);
   return { userId: user.id };
