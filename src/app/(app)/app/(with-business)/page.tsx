@@ -12,7 +12,6 @@ const LINKS = [
   { href: '/app/business', title: 'Business profile', text: 'Seller details printed on every invoice.', icon: IconBuildingStore },
 ];
 
-// Home; invoicing and ZATCA onboarding are added here in later releases.
 export default async function AppHome() {
   const session = await auth();
   const business = session?.user ? await businessService.getMine(session.user.id) : null;
