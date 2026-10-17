@@ -896,3 +896,24 @@ Verified: `tsc --noEmit --incremental false` OK; vitest 390 pass / 1 skipped (go
 Pending (user): (1) force-push `main` over origin 93792d2 (AC0.1) then push `dev`; (2) copy SDK sample XMLs to `tools/zatca-samples/` to un-skip golden tests (AC5.1/5.2); (3) live Simulation: `npm run zatca:sim-check -- --otp <OTP>` (AC6.4), in-app onboarding (AC6.5), AC7.11 steps in docs/context/07-zatca-onboarding.md; (4) set RESEND_API_KEY/EMAIL_FROM, ZATCA_ENCRYPTION_KEY, CRON_SECRET, NEXTAUTH_* in Vercel (all envs incl. previews) and a new prod Prisma Postgres + `migrate deploy`; (5) rotate gadget-website NEXTAUTH_SECRET if prod uses the placeholder; (6) decisions: admin visibility, deferred hardening (admin users pagination, issue rate limits, Origin/CSRF check).
 
 Assumptions to confirm at the Simulation gate: SIGNATURE_INPUT raw hash bytes, SigningTime with Z, IssueTime Z, 9-tag QR on standard docs, X509IssuerName format, response field names, duplicate-response shape (409 / 400 'duplicate|already' → DUPLICATE), clearance 200 = CLEARED.
+
+## Live ZATCA run — info needed from user (noted 2026-10-14)
+
+Portal: need the **Fatoora portal, Simulation environment** ("Onboard new solution unit" → OTP). Developer Portal sandbox is deprecated and unusable here (Developer Portal login only needed to download the SDK ZIP for sample XMLs).
+
+A. Access: which portal is reachable; taxpayer registered in Simulation; VAT group? (11th digit of VAT = 1 → need member 10-digit TIN).
+B. Taxpayer data exactly as in portal: 15-digit VAT (starts+ends 3); Arabic registered name; English name; seller ID type+value (CRN/MOM/MLS/700/SAG/OTH); national address (building 4 digits, street, district, city, postal 5 digits, additional number); business category. Decide: I create the local business record, or user enters it in the app.
+C. Scope: standard + simplified both (functionality map 1100)? Two test customers: valid Saudi B2B (valid VAT + full address) and one deliberately invalid VAT (forced-rejection test).
+D. OTP: generate only when ready (1h, single use; request 2-3). User runs `! npm run zatca:sim-check -- --otp <OTP>` locally and pastes output / newest `tools/zatca-sim-recordings/<ts>/` files back.
+E. Samples: download SDK ZIP, copy only *.xml into `tools/zatca-samples/` (un-skips golden tests).
+F. ZATCA VAT phone app available to scan the simplified QR (tag 4 = total)?
+G. Windows clock synced; OK to use real TRN in Simulation (docs print with SIMULATION watermark).
+
+Order: answer A-C → samples (E) → OTP run → iterate on recordings until 6/6 PASS, 0 warnings → in-app onboarding (AC6.5) → 4 live invoices + QR scan + forced rejection (AC7.11).
+Network check 2026-10-14: gw-fatoora.zatca.gov.sa/e-invoicing/simulation reachable (HTTP 405 to GET = expected).
+
+
+## Sandbox verification (2026-10-14)
+
+User has no taxpayer credentials for the Fatoora/Simulation portals, so AC6.4/AC7.11 are blocked on a taxpayer account. Dev-only `npm run zatca:sandbox-check` (branch merged to dev) runs against the ZATCA Developer Portal sandbox (`/e-invoicing/developer-portal`, OTP 123345, template TSTZATCA-Code-Signing, synthetic VAT 399999999900003). Result (orchestrator re-ran): 6/6 compliance documents HTTP 200 PASS, 0 errors, 0 warnings; production CSID, reporting (REPORTED) and clearance (CLEARED + clearedInvoice) all 200. Tamper tests (agent): wrong hash, altered signature/QR, missing QR/ProfileID are rejected with the expected codes, so the sandbox validates hash/signature/QR/BR-KSA rules for real. Response shapes recorded in docs/context/07-zatca-onboarding.md ("Sandbox findings"); parsers match.
+Still unverified (only Simulation/Production can show): ICV/PIH chain acceptance, real certificate-chain/taxpayer VAT checks, DUPLICATE response shape (sandbox is stateless), 202 warnings / 303, Simulation CSR template `PREZATCA-Code-Signing`, CN/OU/address/businessCategory acceptance, rate limits. Sandbox is called deprecated by ZATCA staff and may vanish.
