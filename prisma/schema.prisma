@@ -3,33 +3,28 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 model User {
-  id                   String               @id @default(cuid())
-  email                String               @unique
-  emailVerified        DateTime?
-  passwordHash         String?
-  name                 String
-  phone                String?
-  role                 UserRole             @default(CUSTOMER)
-  image                String?
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
-  accounts             Account[]
-  addresses            Address[]
-  cart                 Cart?
-  orders               Order[]
-  orderEvents          OrderEvent[]         @relation("OrderEventActor")
-  passwordResets       PasswordResetToken[]
-  paymentVerifications Payment[]            @relation("PaymentVerifier")
-  feeVerifications     Payment[]            @relation("PaymentFeeVerifier")
-  reviews              Review[]
-  sessions             Session[]
-  warrantyRequests     WarrantyRequest[]
+  id             String               @id @default(cuid())
+  email          String               @unique
+  emailVerified  DateTime?
+  passwordHash   String?
+  name           String
+  phone          String?
+  role           UserRole             @default(USER)
+  image          String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  accounts       Account[]
+  passwordResets PasswordResetToken[]
+  sessions       Session[]
+  subscriptions  Subscription[]       @relation("SubscriptionUser")
+  activations    Subscription[]       @relation("SubscriptionActivatedBy")
+  businesses     Business[]
 
   @@index([role])
 }
@@ -83,344 +78,170 @@ model PasswordResetToken {
   @@index([userId])
 }
 
-model Address {
-  id             String   @id @default(cuid())
-  userId         String
-  recipientName  String
-  recipientPhone String
-  line1          String
-  line2          String?
-  city           String
-  district       String?
-  postalCode     String?
-  country        String   @default("BD")
-  isDefault      Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orders         Order[]
-
-  @@index([userId])
-}
-
-model Category {
-  id        String            @id @default(cuid())
-  slug      String            @unique
-  name      String            @unique
-  iconUrl   String?
-  isPopular Boolean           @default(false)
-  status    PublishStatus     @default(PUBLISHED)
-  parentId  String?
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  parent    Category?         @relation("CategoryTree", fields: [parentId], references: [id])
-  children  Category[]        @relation("CategoryTree")
-  products  ProductCategory[]
-
-  @@index([status, isPopular])
-  @@index([parentId])
-}
-
-model Brand {
-  id        String        @id @default(cuid())
-  slug      String        @unique
-  name      String        @unique
-  logoUrl   String?
-  isPopular Boolean       @default(false)
-  status    PublishStatus @default(PUBLISHED)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  products  Product[]
-
-  @@index([status, isPopular])
-}
-
-model Product {
-  id              String            @id @default(cuid())
-  slug            String            @unique
-  name            String
-  description     String
-  brandId         String
-  status          PublishStatus     @default(DRAFT)
-  isPopular       Boolean           @default(false)
-  warrantyMonths  Int               @default(0)
-  metaTitle       String?
-  metaDescription String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  brand           Brand             @relation(fields: [brandId], references: [id])
-  categories      ProductCategory[]
-  images          ProductImage[]
-  variants        ProductVariant[]
-  reviews         Review[]
-
-  @@index([status, brandId])
-}
-
-model ProductCategory {
-  productId  String
-  categoryId String
-  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@id([productId, categoryId])
-  @@index([categoryId])
-}
-
-model ProductImage {
-  id        String  @id @default(cuid())
-  productId String
-  url       String
-  publicId  String
-  alt       String?
-  sortOrder Int     @default(0)
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@index([productId, sortOrder])
-}
-
-model ProductVariant {
-  id                String      @id @default(cuid())
-  productId         String
-  sku               String      @unique
-  name              String?
-  attributes        Json        @default("{}")
-  buyingPriceCents  Int
-  sellingPriceCents Int
-  discountCents     Int         @default(0)
-  stock             Int         @default(0)
-  lowStockThreshold Int         @default(5)
-  isActive          Boolean     @default(true)
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  cartItems         CartItem[]
-  orderItems        OrderItem[]
-  product           Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@index([productId, isActive])
-}
-
-model Cart {
-  id        String     @id @default(cuid())
-  userId    String     @unique
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items     CartItem[]
-}
-
-model CartItem {
-  id        String         @id @default(cuid())
-  cartId    String
-  variantId String
-  quantity  Int            @default(1)
-  cart      Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  variant   ProductVariant @relation(fields: [variantId], references: [id])
-
-  @@unique([cartId, variantId])
-  @@index([variantId])
-}
-
-model Order {
-  id            String            @id @default(cuid())
-  orderNumber   String            @unique
-  userId        String
-  addressId     String
-  status        OrderStatus       @default(PENDING)
-  shipRecipient String
-  shipPhone     String
-  shipLine1     String
-  shipLine2     String?
-  shipCity      String
-  shipDistrict  String?
-  shipPostal    String?
-  shipCountry   String
-  subtotalCents Int
-  discountCents Int               @default(0)
-  shippingCents Int               @default(0)
-  totalCents    Int
-  couponId      String?
-  couponCode    String?
-  notes         String?
-  cancelledAt   DateTime?
-  cancelReason  String?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  address       Address           @relation(fields: [addressId], references: [id])
-  coupon        Coupon?           @relation(fields: [couponId], references: [id])
-  user          User              @relation(fields: [userId], references: [id])
-  events        OrderEvent[]
-  items         OrderItem[]
-  payments      Payment[]
-  warranty      WarrantyRequest[]
-
-  @@index([userId, status])
-  @@index([status, createdAt])
-}
-
-model OrderItem {
-  id               String          @id @default(cuid())
-  orderId          String
-  variantId        String?
-  productId        String?
-  productName      String
-  variantName      String?
-  sku              String
-  imageUrl         String?
-  buyingPriceCents Int
-  unitPriceCents   Int
-  quantity         Int
-  order            Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  variant          ProductVariant? @relation(fields: [variantId], references: [id])
-  reviews          Review?
-
-  @@index([orderId])
-  @@index([productId])
-}
-
-model OrderEvent {
-  id        String      @id @default(cuid())
-  orderId   String
-  status    OrderStatus
-  note      String?
-  actorId   String?
-  createdAt DateTime    @default(now())
-  actor     User?       @relation("OrderEventActor", fields: [actorId], references: [id])
-  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@index([orderId, createdAt])
-}
-
-model Payment {
-  id              String        @id @default(cuid())
-  orderId         String
-  method          PaymentMethod
-  status          PaymentStatus @default(PENDING)
-  amountCents     Int
-  providerRef     String?       @unique
-  // Functional index Payment_bankRef_lower_idx ON lower("bankRef") lives only in
-  // migration 20261008100100_add_payment_bankref_lower_index (Prisma cannot express it).
-  bankRef         String?
-  rawPayload      Json?
-  verifiedById    String?
-  verifiedAt      DateTime?
-  feeCents        Int           @default(0)
-  feeType         CodFeeType?
-  feeValue        Int?
-  feeStatus       CodFeeStatus  @default(NONE)
-  customerTxnId   String?       @unique
-  txnSubmittedAt  DateTime?
-  feeVerifiedById String?
-  feeVerifiedAt   DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  verifiedBy      User?         @relation("PaymentVerifier", fields: [verifiedById], references: [id])
-  feeVerifiedBy   User?         @relation("PaymentFeeVerifier", fields: [feeVerifiedById], references: [id])
-
-  @@index([orderId])
-  @@index([status, method])
-}
-
-model Review {
-  id          String    @id @default(cuid())
-  userId      String
-  productId   String
-  orderItemId String    @unique
-  rating      Int
-  title       String?
-  body        String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([productId, rating])
-  @@index([userId])
-}
-
-model Coupon {
-  id               String     @id @default(cuid())
-  code             String     @unique
-  type             CouponType
-  value            Int
-  minSubtotalCents Int        @default(0)
-  maxDiscountCents Int?
-  startsAt         DateTime?
-  expiresAt        DateTime?
-  usageLimit       Int?
-  usedCount        Int        @default(0)
-  perUserLimit     Int?
-  isActive         Boolean    @default(true)
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
-  orders           Order[]
-
-  @@index([isActive, expiresAt])
-}
-
-model WarrantyRequest {
-  id         String         @id @default(cuid())
-  orderId    String
-  userId     String
-  reason     String
-  status     WarrantyStatus @default(OPEN)
-  resolution String?
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-  order      Order          @relation(fields: [orderId], references: [id])
-  user       User           @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-  @@index([orderId])
-}
-
 enum UserRole {
-  CUSTOMER
+  USER
   ADMIN
 }
 
-enum PublishStatus {
-  DRAFT
-  PUBLISHED
-  ARCHIVED
+enum SubscriptionPlan {
+  MONTH_1
+  MONTH_3
+  MONTH_6
+  MONTH_12
 }
 
-enum OrderStatus {
+enum SubscriptionStatus {
   PENDING
-  CONFIRMED
-  PROCESSING
-  SHIPPED
-  DELIVERED
-  CANCELLED
+  ACTIVE
 }
 
-enum PaymentMethod {
-  COD
-  SSLCOMMERZ
-  BKASH
-  BANK_TRANSFER
+/// At most one PENDING row per user: enforced by the partial unique index
+/// "Subscription_one_pending_per_user" in the migration SQL (Prisma can't model it).
+model Subscription {
+  id            String             @id @default(cuid())
+  userId        String
+  plan          SubscriptionPlan
+  status        SubscriptionStatus @default(PENDING)
+  startsAt      DateTime?
+  endsAt        DateTime?
+  activatedAt   DateTime?
+  activatedById String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  user          User               @relation("SubscriptionUser", fields: [userId], references: [id], onDelete: Cascade)
+  activatedBy   User?              @relation("SubscriptionActivatedBy", fields: [activatedById], references: [id])
+
+  @@index([userId, status])
 }
 
-enum PaymentStatus {
-  PENDING
-  SUCCEEDED
+enum ZatcaEnvironment {
+  SIMULATION
+  PRODUCTION
+}
+
+/// ZATCA seller identification scheme (BT-29-1). "700" is not a valid Prisma identifier, hence S700.
+enum SellerIdScheme {
+  CRN
+  MOM
+  MLS
+  S700 @map("700")
+  SAG
+  OTH
+}
+
+/// ZATCA buyer identification scheme (BT-46-1).
+enum BuyerIdScheme {
+  TIN
+  CRN
+  MOM
+  MLS
+  S700 @map("700")
+  SAG
+  NAT
+  GCC
+  IQA
+  PAS
+  OTH
+}
+
+enum EgsStatus {
+  NEW
+  COMPLIANCE_ISSUED
+  ACTIVE
   FAILED
-  REFUNDED
-  CANCELLED
+  REVOKED
 }
 
-enum CouponType {
-  PERCENT
-  FIXED
+/// The seller. 1:1 with its owner in v1, enforced in business.service (not here),
+/// so multi-business later needs only a selector and a membership table.
+model Business {
+  id               String           @id @default(cuid())
+  ownerId          String
+  nameEn           String
+  nameAr           String
+  vatNumber        String           @db.Char(15)
+  sellerIdScheme   SellerIdScheme
+  sellerIdValue    String
+  street           String
+  streetAr         String?
+  buildingNumber   String           @db.Char(4)
+  additionalNumber String?
+  district         String
+  districtAr       String?
+  city             String
+  cityAr           String?
+  postalCode       String           @db.Char(5)
+  countryCode      String           @default("SA") @db.Char(2)
+  businessCategory String
+  zatcaEnvironment ZatcaEnvironment @default(SIMULATION)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  owner            User             @relation(fields: [ownerId], references: [id])
+  egsUnits         EgsUnit[]
+  customers        Customer[]
+  documents        Document[]
+
+  @@index([ownerId])
 }
 
-enum WarrantyStatus {
-  OPEN
-  APPROVED
-  REJECTED
-  RESOLVED
+/// ZATCA e-invoice generation solution unit. At most one non-REVOKED unit per
+/// (businessId, environment): partial unique index "EgsUnit_one_live_per_business_env"
+/// in the migration SQL. Onboarding (keys, CSIDs) lands in Phase 6.
+model EgsUnit {
+  id                  String           @id @default(cuid())
+  businessId          String
+  environment         ZatcaEnvironment
+  /// Format `1-Fatoora|2-v2|3-<uuid>`.
+  serialNumber        String           @unique
+  commonName          String
+  functionalityMap    String           @default("1100")
+  status              EgsStatus        @default(NEW)
+  privateKeyEnc       String?
+  csrPem              String?
+  complianceRequestId String?
+  complianceCsidEnc   String?
+  complianceSecretEnc String?
+  productionCsidEnc   String?
+  productionSecretEnc String?
+  certificatePem      String?
+  certNotAfter        DateTime?
+  lastIcv             Int              @default(0)
+  /// Starts at the ZATCA PIH seed: base64(sha256 hex of "0").
+  lastInvoiceHash     String           @default("NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==")
+  lastError           String?
+  /// Lease taken while an onboarding run is in flight (one run per EGS); cleared when it ends.
+  onboardingSince     DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  business            Business         @relation(fields: [businessId], references: [id])
+  documents           Document[]
+
+  @@index([businessId])
+}
+
+model Customer {
+  id               String         @id @default(cuid())
+  businessId       String
+  name             String
+  nameAr           String?
+  vatNumber        String?
+  buyerIdScheme    BuyerIdScheme?
+  buyerIdValue     String?
+  street           String?
+  buildingNumber   String?
+  additionalNumber String?
+  district         String?
+  city             String?
+  postalCode       String?
+  countryCode      String         @default("SA") @db.Char(2)
+  email            String?
+  phone            String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  business         Business       @relation(fields: [businessId], references: [id])
+  documents        Document[]
+
+  @@index([businessId])
 }
 
 /// Postgres-backed rate-limit bucket. Replaces the old in-process Map
@@ -434,32 +255,132 @@ model RateLimitBucket {
   @@index([resetAt])
 }
 
-enum CodFeeType {
-  FLAT
-  PERCENT
+enum DocumentKind {
+  INVOICE
+  CREDIT_NOTE
+  DEBIT_NOTE
 }
 
-enum CodFeeStatus {
-  NONE
-  PENDING
-  VERIFIED
+enum DocumentSubtype {
+  STANDARD
+  SIMPLIFIED
+}
+
+enum DocumentStatus {
+  DRAFT
+  ISSUED
+}
+
+enum SubmissionStatus {
+  NOT_SUBMITTED
+  PENDING_RETRY
+  REPORTED
+  CLEARED
   REJECTED
-  WAIVED
 }
 
-/// Singleton (id = 'singleton') admin-configured payment methods and the
-/// COD confirmation fee. `codFeeValue` is cents for FLAT, an integer 1-100
-/// for PERCENT.
-model PaymentSettings {
-  id              String          @id @default("singleton")
-  enabledMethods  PaymentMethod[] @default([COD])
-  codFeeEnabled   Boolean         @default(false)
-  codFeeType      CodFeeType      @default(FLAT)
-  codFeeValue     Int             @default(0)
-  qrImageUrl      String?
-  qrImagePublicId String?
-  contactNumber   String?
-  paymentNote     String?
-  updatedAt       DateTime        @updatedAt
-  updatedById     String?
+/// ZATCA / UNCL5305 VAT category: standard, zero-rated, exempt, out of scope.
+enum TaxCategory {
+  S
+  Z
+  E
+  O
+}
+
+/// An invoice, credit note or debit note. Drafts are mutable; an ISSUED document never is.
+/// Money is integer halalas. The ZATCA columns stay null until issuance (Phase 7).
+model Document {
+  id                    String           @id @default(cuid())
+  businessId            String
+  kind                  DocumentKind
+  subtype               DocumentSubtype
+  status                DocumentStatus   @default(DRAFT)
+  /// Allocated at issue time under a Business row lock (documents.service allocateNumber).
+  sequence              Int?
+  number                String?
+  /// NoAction (= Restrict, checked at statement end): a customer used by a document cannot be deleted
+  /// (CUSTOMER_HAS_DOCUMENTS). Not Restrict: Postgres reports that as 23001, which Prisma does not map to P2003.
+  customerId            String?
+  /// Frozen seller/buyer copies, written at issue (shape: PartySnapshot in contracts/documents).
+  buyerSnapshot         Json?
+  sellerSnapshot        Json?
+  issueDate             DateTime?        @db.Date
+  /// hh:mm:ssZ (UTC), the same instant as issuedAt.
+  issueTime             String?
+  issuedAt              DateTime?
+  supplyDate            DateTime?        @db.Date
+  supplyEndDate         DateTime?        @db.Date
+  currency              String           @default("SAR")
+  /// UNTDID 4461: 10 cash, 30 credit, 42 bank account, 48 bank card, 1 not defined.
+  paymentMeansCode      String?
+  docDiscountHalalas    Int              @default(0)
+  docDiscountReason     String?
+  lineExtensionHalalas  Int              @default(0)
+  allowanceTotalHalalas Int              @default(0)
+  taxExclusiveHalalas   Int              @default(0)
+  taxHalalas            Int              @default(0)
+  taxInclusiveHalalas   Int              @default(0)
+  payableHalalas        Int              @default(0)
+  billingReferenceId    String?
+  noteReason            String?
+  notes                 String?
+  egsUnitId             String?
+  uuid                  String?          @unique
+  icv                   Int?
+  pih                   String?
+  invoiceHash           String?
+  signedXml             String?          @db.Text
+  clearedXml            String?          @db.Text
+  qrBase64              String?          @db.Text
+  signingTime           DateTime?
+  submissionStatus      SubmissionStatus @default(NOT_SUBMITTED)
+  hasWarnings           Boolean          @default(false)
+  zatcaResponse         Json?
+  submissionAttempts    Int              @default(0)
+  lastAttemptAt         DateTime?
+  /// Lease taken while a submission is in flight (cron and manual retry must not double-submit); cleared when done.
+  submittingSince       DateTime?
+  /// True when issued on a SIMULATION EGS.
+  isTest                Boolean          @default(false)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  business              Business         @relation(fields: [businessId], references: [id])
+  customer              Customer?        @relation(fields: [customerId], references: [id], onDelete: NoAction)
+  /// NoAction (checked at statement end) so a note and its original can be removed in one deleteMany.
+  billingReference      Document?        @relation("DocumentBillingReference", fields: [billingReferenceId], references: [id], onDelete: NoAction)
+  referencedBy          Document[]       @relation("DocumentBillingReference")
+  /// NoAction: an EGS unit that signed a document cannot be deleted (default SetNull would orphan the chain).
+  egsUnit               EgsUnit?         @relation(fields: [egsUnitId], references: [id], onDelete: NoAction)
+  lines                 DocumentLine[]
+
+  @@unique([businessId, kind, sequence])
+  /// One ICV per EGS chain (NULLs allowed for drafts). The partial index on PENDING_RETRY documents lives in the migration SQL only.
+  @@unique([egsUnitId, icv])
+  @@index([businessId, createdAt])
+  @@index([customerId])
+  @@index([billingReferenceId])
+}
+
+model DocumentLine {
+  id                  String      @id @default(cuid())
+  documentId          String
+  position            Int
+  description         String
+  descriptionAr       String?
+  /// Up to 6 decimals; the VAT engine works in micro-units.
+  quantity            Decimal     @db.Decimal(18, 6)
+  unitCode            String      @default("PCE")
+  unitPriceHalalas    Int
+  lineDiscountHalalas Int         @default(0)
+  taxCategory         TaxCategory
+  /// Basis points: S = 1500, the others 0.
+  taxRateBp           Int
+  exemptionReasonCode String?
+  exemptionReason     String?
+  netHalalas          Int
+  vatHalalas          Int
+  totalHalalas        Int
+  document            Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, position])
 }

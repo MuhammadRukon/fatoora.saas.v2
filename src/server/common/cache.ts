@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Redis } from '@upstash/redis';
 import { getRedis } from '@/lib/redis';
+import { errMsg } from './errors';
 import { log } from './logger';
 
 export interface CacheStore {
@@ -127,7 +128,7 @@ export async function withStore<T>(
   } catch (err) {
     if (++failures >= BREAKER_THRESHOLD) openUntil = Date.now() + BREAKER_OPEN_MS;
     log.warn('cache store failure', {
-      error: err instanceof Error ? err.message : String(err),
+      error: errMsg(err),
       failures,
     });
     return { ok: false };
@@ -197,7 +198,7 @@ export async function cached<T>(
 
 export function buildKey(...parts: (string | number)[]): string {
   const env = process.env.VERCEL_ENV ?? (process.env.NODE_ENV === 'test' ? 'test' : 'local');
-  return `gw:${env}:${parts.join(':')}`;
+  return `fatoora:${env}:${parts.join(':')}`;
 }
 
 function sortKeys(v: unknown): unknown {

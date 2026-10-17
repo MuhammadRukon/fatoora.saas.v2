@@ -2,10 +2,13 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
+const under = (pathname: string, prefix: string) =>
+  pathname === prefix || pathname.startsWith(`${prefix}/`);
+
 /**
- * Edge guard for admin-only routes. Verifies the JWT (role is baked in
+ * Edge guard for admin-only and user (app) routes. Verifies the JWT (role is baked in
  * at sign-in, see authOptions.ts `jwt` callback) rather than just
- * checking that a session cookie exists — a CUSTOMER's valid session
+ * checking that a session cookie exists — a USER's valid session
  * no longer passes this check. This is verification only, not
  * revocation: a demoted admin's existing token still passes until it
  * expires. Route-level `requireAdminSession()` and the dashboard
@@ -16,7 +19,9 @@ import { getToken } from 'next-auth/jwt';
 export default async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const needsAdmin = pathname.startsWith('/dashboard') || pathname.startsWith('/api/admin');
-  const needsUser = pathname.startsWith('/account');
+  const needsUser = ['/app', '/plans', '/api/app', '/api/subscriptions'].some((p) =>
+    under(pathname, p),
+  );
 
   if (!needsAdmin && !needsUser) return NextResponse.next();
 
@@ -31,9 +36,11 @@ export default async function proxy(req: NextRequest) {
     secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
     secureCookie,
   });
-  // Admin routes require the ADMIN role; /account only requires any
-  // authenticated user. Verifying the JWT here (not just cookie
-  // presence) means a CUSTOMER token can't reach admin routes.
+  // Admin routes require the ADMIN role; user routes only require any
+  // authenticated user here (route handlers return 403 for an ADMIN, and
+  // the subscription gate lives in requireAppSession / the /app layout).
+  // Verifying the JWT here (not just cookie presence) means a USER token
+  // can't reach admin routes.
   const authorized = needsAdmin ? !!token && token.role === 'ADMIN' : !!token;
 
   if (!authorized) {
@@ -49,9 +56,27 @@ export default async function proxy(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return NextResponse.next();
+  // Admins have no app area: send them to their own.
+  if (needsUser && token?.role === 'ADMIN' && !pathname.startsWith('/api/')) {
+    const url = req.nextUrl.clone();
+    url.pathname = '/dashboard';
+    url.search = '';
+    return NextResponse.redirect(url);
+  }
+
+  // The /app layout needs the path to decide read-only access for an EXPIRED subscription.
+  const headers = new Headers(req.headers);
+  headers.set('x-pathname', pathname);
+  return NextResponse.next({ request: { headers } });
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/api/admin/:path*', '/account/:path*'],
+  matcher: [
+    '/dashboard/:path*',
+    '/api/admin/:path*',
+    '/app/:path*',
+    '/plans',
+    '/api/app/:path*',
+    '/api/subscriptions/:path*',
+  ],
 };

@@ -1,96 +1,54 @@
 # API Reference
 
-All routes live under `src/app/api/**`. Auth levels: **public**, **user** (`requireSession`), **admin** (`requireAdminSession`). Bodies/queries are validated with Zod contracts from `src/contracts/**`. Rate-limited routes return 429 + `Retry-After` (policy per route in [02-architecture.md](./02-architecture.md#rate-limiting--logging)). Listing pages (`/products`, `/category/*`, `/brand/*`) and their `/live/*` twins are pages, not API routes; see [Caching / ISR](./02-architecture.md#caching--isr).
+All routes live under `src/app/api/**`. Auth levels: **public**, **user** (`requireUserSession`: role USER, 403 for an admin), **app** (`requireAppSession`: USER with an ACTIVE subscription, else 402 `SUBSCRIPTION_REQUIRED`), **app-read** (`requireBusinessReadContext`: like app, but an EXPIRED subscription may also read; used only by the GET routes over issued documents), **admin** (`requireAdminSession`). Bodies are validated with Zod contracts from `src/contracts/**`. Rate-limited routes return 429 + `Retry-After`.
 
 ## Auth
 
 | Route | Methods | Auth | Notes |
 | --- | --- | --- | --- |
 | `/api/auth/[...nextauth]` | GET/POST | public | Auth.js handlers |
-| `/api/auth/signup` | POST | public | rate-limited; bcrypt hash |
-| `/api/auth/forgot` | POST | public | rate-limited; no email enumeration; reset link is emailed; outside production the response also carries `devResetUrl` |
-| `/api/auth/reset` | POST | public | rate-limited; single-use hashed token |
+| `/api/auth/signup` | POST | public | rate-limited (5 / 15 min / IP); bcrypt hash; creates `role: USER` |
+| `/api/auth/forgot` | POST | public | rate-limited (5 / h / IP); no email enumeration; outside production the response also carries `devResetUrl` |
+| `/api/auth/reset` | POST | public | rate-limited (10 / h / IP); single-use hashed token |
 
-Email verification (verify code, resend) runs as server actions in `src/modules/auth/actions.ts`, not as routes; both are rate-limited.
+Signup, email verification (verify code, resend), forgot/reset and change-password also run as server actions in `src/modules/auth/actions.ts`; all are rate-limited.
 
-## Catalog (public)
-
-All four routes send `Cache-Control: public, s-maxage=30, stale-while-revalidate=60`.
-
-| Route | Methods | Notes |
-| --- | --- | --- |
-| `/api/catalog/products` | GET | list published products; q/category/brand/price/stock/sort/page params; `q` requests are IP-rate-limited (120/min) |
-| `/api/catalog/products/[slug]` | GET | product detail |
-| `/api/catalog/categories` | GET | published categories |
-| `/api/catalog/brands` | GET | published brands |
-
-## Cart
+## Subscriptions
 
 | Route | Methods | Auth | Notes |
 | --- | --- | --- | --- |
-| `/api/cart` | GET/POST/PUT/DELETE | user | GET cart (`?view=summary` returns only `{ subtotalCents, itemCount, hasIssues }`), add item, merge guest cart (PUT), clear. PUT returns the `CartSnapshot` fields (`lines`, `subtotalCents`, `itemCount`) plus an additive `adjustments` array (`{ variantId, name?, requested, applied }`; `applied` 0 = removed because inactive or out of stock, below `requested` = clamped to stock; schema `mergeAdjustmentSchema` in `src/contracts/cart.ts`) |
-| `/api/cart/[itemId]` | PATCH/DELETE | user | update qty / remove line |
-| `/api/cart/hydrate` | POST | **public** | enrich guest-cart variant ids for display; no persistence; IP-rate-limited (120/min), max 50 lines |
+| `/api/subscriptions` | POST | user | `{plan}` → 201 PENDING subscription; 409 `SUBSCRIPTION_PENDING` while one is open; 422 on an unknown plan |
+| `/api/subscriptions/me` | GET | user | `{state: NONE\|PENDING\|ACTIVE\|EXPIRED, activeUntil, pending}` |
+| `/api/app/ping` | GET | app | gate fixture: `{ok:true}`; every future `/api/app/**` route uses `requireAppSession()` |
 
-## Checkout & orders
-
-| Route | Methods | Auth | Notes |
-| --- | --- | --- | --- |
-| `/api/checkout/config` | GET | user | enabled payment methods, COD fee rule (type/value), QR/contact/note (all nullable); `force-dynamic`, `Cache-Control: no-store` |
-| `/api/checkout/quote` | POST | user | rate-limited (30/min/user); accepts optional `paymentMethod`; returns totals + shipping + coupon validation + `codFeeCents`, `dueOnDeliveryCents`, `codFeeRule` |
-| `/api/checkout` | POST | user | rate-limited; transactional order placement, accepts optional `customerTxnId`; returns `feeRequired` flag |
-| `/api/orders` | GET | user | my orders |
-| `/api/orders/[id]` | GET/POST | user | detail; `?action=cancel` self-cancel (restocks) |
-| `/api/orders/[id]/warranty` | POST | user | rate-limited (5/h/user); file warranty claim (DELIVERED only) |
-
-## Payments
+## App (user, active subscription, 402 otherwise)
 
 | Route | Methods | Auth | Notes |
 | --- | --- | --- | --- |
-| `/api/payments/bank` | POST | user | submit bank transfer reference |
-| `/api/payments/txn-check` | POST | user | rate-limited; check if COD txn ID exists; boolean response only (privacy) |
-| `/api/payments/txn-id` | POST | user | rate-limited; customer submits COD txn ID for fee-pending order; add-only |
-| `/api/payments/bkash/{success,fail,cancel}` | GET/POST | **public** | gateway callbacks → `_handlers.ts` |
-| `/api/payments/sslcommerz/{success,fail,cancel,ipn}` | POST | **public** | gateway callbacks → `_handlers.ts` |
-| `/api/payments/sandbox/{bkash,sslcommerz}` | GET | **public** | local sandbox harness pages; only reachable as a fallback when gateway credentials are absent |
+| `/api/app/business` | GET, PUT | app | GET returns the profile or `null`; PUT creates the first time, then updates; 422 on field errors; 409 `BUSINESS_LOCKED_FIELDS` |
+| `/api/app/customers` | GET, POST | app + business | GET `?q=&cursor=&limit=` cursor page; POST 201; 409 `BUSINESS_REQUIRED` before a business exists |
+| `/api/app/documents` | GET, POST | GET app-read, POST app + business | GET `?kind=&status=&submissionStatus=&q=&cursor=&limit=`; POST creates a DRAFT (201), totals engine-computed, unknown fields stripped; 422 on contract/engine errors, 409 `ORIGINAL_NOT_ISSUED`, 404 for another business's customer/original |
+| `/api/app/documents/[id]` | GET, PATCH, DELETE | GET app-read, others app + business | PATCH/DELETE only on DRAFT (else 409 `DOCUMENT_IMMUTABLE`); other business's id is 404 |
+| `/api/app/documents/[id]/duplicate` | POST | app + business | copies any document into a new DRAFT (201) |
+| `/api/app/documents/[id]/issue` | POST | app + business | issue (lock EGS + document, number, sign, persist) then submit to ZATCA; **200 even when ZATCA rejects** (verdict in `submissionStatus`, errors in `submissionErrors`); 409 `ZATCA_NOT_ONBOARDED` / `DOCUMENT_IMMUTABLE` / `ORIGINAL_NOT_ISSUED`, 422 `BUYER_INCOMPLETE` (meta.fields) / `SUPPLY_DATE_IN_FUTURE` |
+| `/api/app/documents/[id]/retry` | POST | app + business | resubmit a PENDING_RETRY document; 409 `NOT_PENDING_RETRY` otherwise |
+| `/api/app/documents/[id]/xml` | GET | app-read + business | `application/xml` attachment `<number>.xml`, `clearedXml ?? signedXml`; 409 `NOT_ISSUED` for a draft |
+| `/api/cron/zatca-retry` | GET | `Authorization: Bearer $CRON_SECRET` (no session; not matched by the proxy) | retries up to 50 PENDING_RETRY documents, least recently attempted first, stopping new submissions after 45 s; 401 without the secret (also when `CRON_SECRET` is unset); returns `{processed}`. `vercel.json` schedules it daily at 03:00 UTC (Hobby); change to `0 * * * *` on Pro |
+| `/api/app/customers/[id]` | GET, PATCH, DELETE | app + business | another business's id is 404; DELETE 204; 409 `CUSTOMER_HAS_DOCUMENTS` once documents reference it |
+| `/api/app/zatca` | GET | app + business | `{environment, egs: {status, serialNumber, certNotAfter, lastError} \| null}`; never keys, tokens or secrets |
+| `/api/app/zatca/onboard` | POST | app + business | body `{otp: "123456"}` (422 otherwise); 429 after 5 attempts per hour per business; 409 if the EGS is already ACTIVE; 200 `{status, errors, results[]}` even when ZATCA rejected (`status: FAILED`, `errors` has ZATCA's text) |
 
-## Reviews & warranty (customer)
+## Admin
 
 | Route | Methods | Auth | Notes |
 | --- | --- | --- | --- |
-| `/api/reviews` | GET/POST | GET public / POST user | GET: up to 50 newest reviews for `productId` (`items` only; the PDP renders the summary and the first 10 itself), `Cache-Control: public, s-maxage=10`, author names "First L."; POST: rate-limited (10/h/user), create (delivered items only), then purges the PDP via `revalidateProductPage` |
-| `/api/reviews/reviewable` | GET | user | delivered items eligible for review |
-| `/api/warranty` | GET | user | my warranty requests |
+| `/api/admin/users` | GET | admin | list users (newest first) with `subscriptions` (latest 5) and computed `subscriptionState`; no create/edit (admins are seed-created) |
+| `/api/admin/subscriptions/[id]/activate` | POST | admin | activate a PENDING request under a row lock → 200; 409 `SUBSCRIPTION_NOT_PENDING`; 404 unknown id |
 
-## Account
-
-| Route | Methods | Auth |
-| --- | --- | --- |
-| `/api/addresses` | GET/POST | user |
-| `/api/addresses/[id]` | PATCH/DELETE | user |
-
-## Admin (all `requireAdminSession`)
-
-| Route | Methods | Notes |
-| --- | --- | --- |
-| `/api/admin/analytics` | GET | 30-day overview: revenue, profit, orders, customers, top sellers, low stock |
-| `/api/admin/catalog/products` (+`/[id]`) | GET/POST/PATCH/DELETE | full CRUD; smart delete (archive if referenced); writes purge ISR via `revalidateCatalog` (as do categories and brands) |
-| `/api/admin/catalog/categories` (+`/[id]`) | GET/POST/PATCH/DELETE | delete blocked if products attached |
-| `/api/admin/catalog/brands` (+`/[id]`) | GET/POST/PATCH/DELETE | delete blocked if products attached |
-| `/api/admin/coupons` (+`/[id]`) | GET/POST/PATCH/DELETE | delete blocked if used by orders |
-| `/api/admin/orders` (+`/[id]`) | GET/PATCH | list all (no server pagination); status transition + note |
-| `/api/admin/payments` | GET | pending COD/bank-transfer/fee-verify payments |
-| `/api/admin/payments/[id]/verify` | POST | verify/reject; `outcome` (`SUCCEEDED` or `FAILED`) is required |
-| `/api/admin/payments/[id]/fee` | POST | COD confirmation fee: verify/reject; VERIFIED confirms order and sends email |
-| `/api/admin/payments/[id]/txn-id` | POST | admin sets/replaces COD txn ID; returns 409 on duplicate with meta.existingOrderId |
-| `/api/admin/settings/payments` | GET/PUT | read/update PaymentSettings (methods enabled, COD fee rule, QR, contact, note); GET returns `gatewayConfigured` too |
-| `/api/admin/users` (+`/[id]`) | GET/POST/PATCH | list/create/edit users incl. role; no delete |
-| `/api/admin/warranty` (+`/[id]`) | GET/PATCH | list/filter; status transition + resolution |
-| `/api/admin/media/upload` | POST | Cloudinary upload, 5 MB, type allowlist |
-| `/api/admin/media/delete` | POST | Cloudinary destroy |
+A non-admin token gets 401 from the edge guard (`src/proxy.ts`) before the route runs; the route itself answers 401 (no session) or 403 (not admin).
 
 ## Misc
 
-| Route | Methods | Notes |
-| --- | --- | --- |
-| `/api/health` | GET | returns `{message:'OK'}`; no DB ping |
+| Route | Methods | Auth | Notes |
+| --- | --- | --- | --- |
+| `/api/health` | GET | public | returns `{message:'OK'}`; no DB ping |

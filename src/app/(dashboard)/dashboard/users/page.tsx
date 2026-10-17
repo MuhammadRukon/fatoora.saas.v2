@@ -1,157 +1,57 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { ColumnDef } from '@tanstack/react-table';
-import { UserRole } from '@prisma/client';
-import { Badge } from '@/components/ui/badge';
-import Image from 'next/image';
 
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DataTable } from '@/components/data-table';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { IconDotsVertical } from '@tabler/icons-react';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Modal } from '@/app/components/modal/modal';
-import { useAdminUserMutations, useAdminUsers } from '@/modules/admin/catalog/hooks';
-import {
-  adminUserCreateSchema,
-  type AdminUserCreateInput,
-  type AdminUserUpdateInput,
-} from '@/contracts/admin-users';
-import { AdminUser } from '@/server/catalog/catalog.repo';
+import { planLabel, type SubscriptionStateName } from '@/contracts/subscriptions';
+import { formatDate } from '@/lib/utils';
+import { useActivateSubscription, useAdminUsers } from '@/modules/admin/users/hooks';
+import type { AdminUser } from '@/server/users/users.service';
 
-const ROLE_OPTIONS: Array<{ value: UserRole; label: string }> = [
-  { value: UserRole.ADMIN, label: 'Admin' },
-  { value: UserRole.CUSTOMER, label: 'Customer' },
-];
-
-const defaultValues: AdminUserCreateInput = {
-  name: '',
-  email: '',
-  phone: '',
-  image: '',
-  role: UserRole.CUSTOMER,
-  password: '',
+const STATE_BADGE: Record<SubscriptionStateName, { label: string; className: string }> = {
+  ACTIVE: {
+    label: 'Active',
+    className: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300',
+  },
+  PENDING: {
+    label: 'Pending',
+    className: 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300',
+  },
+  EXPIRED: { label: 'Expired', className: 'text-muted-foreground' },
+  NONE: { label: 'None', className: 'border-dashed text-muted-foreground' },
 };
+
+const dash = <span className="text-muted-foreground">-</span>;
 
 export default function AdminUsersPage() {
   const { data: users = [], isLoading } = useAdminUsers();
-  const { create, update } = useAdminUserMutations();
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<AdminUser | null>(null);
-
-  const form = useForm<AdminUserCreateInput>({
-    resolver: zodResolver(adminUserCreateSchema),
-    defaultValues,
-  });
-
-  function openCreate() {
-    setEditing(null);
-    form.reset(defaultValues);
-    setOpen(true);
-  }
-
-  function openEdit(user: AdminUser) {
-    setEditing(user);
-    form.reset({
-      name: user.name || '',
-      email: user.email,
-      phone: user.phone || '',
-      image: user.image || '',
-      role: user.role,
-      password: '',
-    });
-    setOpen(true);
-  }
-
-  async function onSubmit(values: AdminUserCreateInput) {
-    try {
-      if (editing) {
-        const payload: AdminUserUpdateInput = {
-          name: values.name,
-          phone: values.phone || null,
-          image: values.image || null,
-          role: values.role,
-        };
-        await update.mutateAsync({ id: editing.id, input: payload });
-      } else {
-        await create.mutateAsync({
-          ...values,
-          phone: values.phone || null,
-          image: values.image || null,
-          password: values.password || undefined,
-        });
-      }
-      setOpen(false);
-      setEditing(null);
-      form.reset(defaultValues);
-    } catch {
-      // toast handled in hook
-    }
-  }
+  const activate = useActivateSubscription();
+  const [confirming, setConfirming] = useState<AdminUser | null>(null);
+  const pending = confirming?.subscriptionState.pending;
 
   const columns: ColumnDef<AdminUser>[] = [
-    {
-      accessorKey: 'image',
-      header: 'Avatar',
-      cell: ({ row }) => (
-        row.original.image ? (
-          <Image
-            src={row.original.image}
-            alt={row.original.name || row.original.email}
-            width={36}
-            height={36}
-            className="size-9 rounded-full object-cover"
-          />
-        ) : (
-          <div className="bg-muted text-muted-foreground flex size-9 items-center justify-center rounded-full text-xs">
-            {(row.original.name || row.original.email).charAt(0).toUpperCase()}
-          </div>
-        )
-      ),
-    },
     {
       accessorKey: 'name',
       header: 'Name',
       cell: ({ row }) => (
-        <div className="flex flex-col">
-          <span>{row.original.name || 'N/A'}</span>
-          <span className="text-muted-foreground text-xs">{row.original.email}</span>
+        <div className="flex items-center gap-3">
+          {/* Initials only: next.config has no remote image hosts. */}
+          <span
+            aria-hidden
+            className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+          >
+            {(row.original.name || row.original.email).charAt(0).toUpperCase()}
+          </span>
+          <span className="font-medium">{row.original.name || 'N/A'}</span>
+          {row.original.role === 'ADMIN' ? <Badge variant="outline">Admin</Badge> : null}
         </div>
       ),
     },
-    {
-      accessorKey: 'role',
-      header: 'Role',
-      cell: ({ row }) => <Badge variant="outline">{row.original.role}</Badge>,
-    },
-    {
-      accessorKey: 'phone',
-      header: 'Phone',
-      cell: ({ row }) => row.original.phone || 'N/A',
-    },
+    { accessorKey: 'email', header: 'Email' },
     {
       accessorKey: 'emailVerified',
       header: 'Verified',
@@ -159,158 +59,80 @@ export default function AdminUsersPage() {
     },
     {
       accessorKey: 'createdAt',
-      header: 'Created',
-      cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString(),
+      header: 'Joined',
+      cell: ({ row }) => <span className="tabular-nums">{formatDate(row.original.createdAt)}</span>,
+    },
+    {
+      id: 'subscription',
+      accessorFn: (u) => u.subscriptionState.state,
+      header: 'Subscription',
+      cell: ({ row }) => {
+        const badge = STATE_BADGE[row.original.subscriptionState.state];
+        return (
+          <Badge variant="outline" className={badge.className}>
+            {badge.label}
+          </Badge>
+        );
+      },
+    },
+    {
+      id: 'latestPlan',
+      accessorFn: (u) => u.subscriptions[0]?.plan ?? '',
+      header: 'Latest plan',
+      cell: ({ row }) => {
+        const latest = row.original.subscriptions[0];
+        return latest ? planLabel(latest.plan) : dash;
+      },
+    },
+    {
+      id: 'requestedAt',
+      accessorFn: (u) => u.subscriptions[0]?.createdAt ?? '',
+      header: 'Requested at',
+      cell: ({ row }) => {
+        const latest = row.original.subscriptions[0];
+        return latest ? <span className="tabular-nums">{formatDate(latest.createdAt)}</span> : dash;
+      },
+    },
+    {
+      id: 'activeUntil',
+      accessorFn: (u) => u.subscriptionState.activeUntil ?? '',
+      header: 'Active until',
+      cell: ({ row }) => {
+        const until = row.original.subscriptionState.activeUntil;
+        return until ? <span className="tabular-nums">{formatDate(until)}</span> : dash;
+      },
     },
     {
       id: 'actions',
-      header: 'Actions',
-      cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <IconDotsVertical />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => openEdit(row.original)}>Edit</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
+      header: 'Action',
+      cell: ({ row }) =>
+        row.original.subscriptionState.pending ? (
+          <Button
+            size="sm"
+            onClick={() => setConfirming(row.original)}
+            disabled={activate.isPending}
+          >
+            Activate
+          </Button>
+        ) : null,
     },
   ];
 
   return (
     <>
-      <DataTable
-        OpenModal={openCreate}
-        AddButtonText="Add User"
-        columns={columns}
-        data={isLoading ? [] : users}
+      <DataTable columns={columns} data={isLoading ? [] : users} />
+      <ConfirmDialog
+        open={!!confirming}
+        onOpenChange={(open) => !open && setConfirming(null)}
+        title="Activate subscription?"
+        description={
+          pending && confirming
+            ? `${confirming.name || confirming.email} gets ${planLabel(pending.plan)} of access, starting now or after their current period ends.`
+            : ''
+        }
+        confirmLabel="Activate"
+        onConfirm={() => pending && activate.mutate(pending.id)}
       />
-      <Modal
-        title={editing ? 'Edit User' : 'Add User'}
-        isOpen={open}
-        onChange={(isOpen) => {
-          if (!isOpen) {
-            setOpen(false);
-            setEditing(null);
-          }
-        }}
-      >
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="John Doe" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input {...field} type="email" placeholder="john@example.com" readOnly={!!editing} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone</FormLabel>
-                  <FormControl>
-                    <Input
-                      value={field.value ?? ''}
-                      onChange={field.onChange}
-                      placeholder="+8801XXXXXXXXX"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="image"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Avatar URL</FormLabel>
-                  <FormControl>
-                    <Input
-                      value={field.value ?? ''}
-                      onChange={field.onChange}
-                      placeholder="https://example.com/avatar.jpg"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Role</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select role" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {ROLE_OPTIONS.map((role) => (
-                        <SelectItem key={role.value} value={role.value}>
-                          {role.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {!editing ? (
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password (optional)</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="password"
-                        placeholder="Minimum 8 characters"
-                        value={field.value ?? ''}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            ) : null}
-
-            <Button type="submit" disabled={create.isPending || update.isPending}>
-              {editing ? 'Save Changes' : 'Create User'}
-            </Button>
-          </form>
-        </Form>
-      </Modal>
     </>
   );
 }

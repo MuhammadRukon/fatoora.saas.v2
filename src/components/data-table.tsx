@@ -52,7 +52,7 @@ export interface BaseEntity {
 
 interface DataTableProps<T extends BaseEntity> {
   data: T[];
-  OpenModal: (id?: string) => void;
+  OpenModal?: (id?: string) => void;
   AddButtonText?: string;
   columns: ColumnDef<T, unknown>[]; // second generic is cell value
 }
@@ -119,7 +119,7 @@ export function DataTable<T extends BaseEntity>({
         </DropdownMenu>
 
         {AddButtonText && (
-          <Button onClick={() => OpenModal()} variant="outline" size="sm">
+          <Button onClick={() => OpenModal?.()} variant="outline" size="sm">
             <PlusIcon /> {AddButtonText}
           </Button>
         )}

@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { verifyEmailSchema, type VerifyEmailInput } from '@/contracts/auth';
 import { resendVerificationAction, verifyEmailAction } from '@/modules/auth/actions';
 import { AuthCard } from '@/modules/auth/components/auth-card';
-import { Loader } from '@/app/common/loader/loader';
+import { Loader } from '@/components/common/loader';
 
 const RESEND_COOLDOWN_S = 60;
 

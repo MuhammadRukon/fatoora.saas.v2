@@ -4,8 +4,8 @@ import { assertLocalDatabase, describeTarget } from '../db-target';
 
 type GuardArgs = Parameters<typeof assertLocalDatabase>[0];
 
-const LOCAL = 'postgresql://u:p@localhost:5433/gadget_dev';
-const SHADOW = 'postgresql://u:p@localhost:5433/gadget_shadow';
+const LOCAL = 'postgresql://u:p@localhost:5433/fatoora_v2';
+const SHADOW = 'postgresql://u:p@localhost:5433/fatoora_v2_shadow';
 // Unescaped "/" in a password: host becomes "u", path becomes "/ss@h".
 const LEAKY = 'postgresql://u:1/ss@h';
 
@@ -28,19 +28,19 @@ function messageOf(args: GuardArgs): string {
 describe('db-target: assertLocalDatabase accepts', () => {
   it.each<[string, GuardArgs]>([
     ['localhost', { databaseUrl: LOCAL }],
-    ['127.0.0.1', { databaseUrl: 'postgresql://u:p@127.0.0.1:5433/gadget_dev' }],
-    ['[::1]', { databaseUrl: 'postgresql://u:p@[::1]:5433/gadget_dev' }],
+    ['127.0.0.1', { databaseUrl: 'postgresql://u:p@127.0.0.1:5433/fatoora_v2' }],
+    ['[::1]', { databaseUrl: 'postgresql://u:p@[::1]:5433/fatoora_v2' }],
     ['unrelated query params', { databaseUrl: `${LOCAL}?schema=public&connection_limit=5` }],
     ['an absent shadowUrl (undefined)', { databaseUrl: LOCAL, shadowUrl: undefined }],
     ['an absent shadowUrl (empty string)', { databaseUrl: LOCAL, shadowUrl: '' }],
     ['a distinct local shadowUrl', { databaseUrl: LOCAL, shadowUrl: SHADOW }],
     [
       'a different database name on the same host and port',
-      { databaseUrl: LOCAL, shadowUrl: 'postgresql://u:p@127.0.0.1:5433/gadget_shadow' },
+      { databaseUrl: LOCAL, shadowUrl: 'postgresql://u:p@127.0.0.1:5433/fatoora_v2_shadow' },
     ],
     [
       'the same database name on a different port',
-      { databaseUrl: LOCAL, shadowUrl: 'postgresql://u:p@localhost:5434/gadget_dev' },
+      { databaseUrl: LOCAL, shadowUrl: 'postgresql://u:p@localhost:5434/fatoora_v2' },
     ],
     [
       'a valid distinct shadowUrl when requireShadow is true',
@@ -123,7 +123,7 @@ describe('db-target: assertLocalDatabase host override params', () => {
     ['HostAddr (case-insensitive)', '?HostAddr=', '1.2.3.4'],
   ])('rejects a %s query param', (_label, param, value) => {
     const message = messageOf({ databaseUrl: `${LOCAL}${param}${value}` });
-    expect(message).toContain('localhost/gadget_dev');
+    expect(message).toContain('localhost/fatoora_v2');
     expect(message).not.toContain(value);
   });
 });
@@ -134,22 +134,22 @@ describe('db-target: assertLocalDatabase shadow must differ from database', () =
     [
       'same host, port and path but different credentials',
       LOCAL,
-      'postgresql://other:otherpw@localhost:5433/gadget_dev',
+      'postgresql://other:otherpw@localhost:5433/fatoora_v2',
     ],
-    ['localhost vs 127.0.0.1', LOCAL, 'postgresql://u:p@127.0.0.1:5433/gadget_dev'],
-    ['localhost vs [::1]', LOCAL, 'postgresql://u:p@[::1]:5433/gadget_dev'],
+    ['localhost vs 127.0.0.1', LOCAL, 'postgresql://u:p@127.0.0.1:5433/fatoora_v2'],
+    ['localhost vs [::1]', LOCAL, 'postgresql://u:p@[::1]:5433/fatoora_v2'],
     [
       'omitted port vs :5432',
-      'postgresql://u:p@localhost/gadget_dev',
-      'postgresql://u:p@localhost:5432/gadget_dev',
+      'postgresql://u:p@localhost/fatoora_v2',
+      'postgresql://u:p@localhost:5432/fatoora_v2',
     ],
     [
       '127.0.0.1:5432 vs omitted port on localhost',
-      'postgresql://u:p@127.0.0.1:5432/gadget_dev',
-      'postgresql://u:p@localhost/gadget_dev',
+      'postgresql://u:p@127.0.0.1:5432/fatoora_v2',
+      'postgresql://u:p@localhost/fatoora_v2',
     ],
-    ['trailing slash', LOCAL, 'postgresql://u:p@localhost:5433/gadget_dev/'],
-    ['path case', LOCAL, 'postgresql://u:p@localhost:5433/Gadget_Dev'],
+    ['trailing slash', LOCAL, 'postgresql://u:p@localhost:5433/fatoora_v2/'],
+    ['path case', LOCAL, 'postgresql://u:p@localhost:5433/Fatoora_V2'],
   ])('rejects a shadowUrl that is the same database (%s)', (_label, databaseUrl, shadowUrl) => {
     const message = messageOf({ databaseUrl, shadowUrl });
     expect(message).toMatch(/must differ/);
@@ -188,18 +188,18 @@ describe('db-target: describeTarget', () => {
   it.each([
     [
       'strips credentials and query, keeps the port',
-      'postgresql://u:secretpw@localhost:5433/gadget_dev?sslmode=disable',
-      'localhost:5433/gadget_dev',
+      'postgresql://u:secretpw@localhost:5433/fatoora_v2?sslmode=disable',
+      'localhost:5433/fatoora_v2',
     ],
     [
       'omits the port when none is given',
-      'postgresql://u:secretpw@localhost/gadget_dev',
-      'localhost/gadget_dev',
+      'postgresql://u:secretpw@localhost/fatoora_v2',
+      'localhost/fatoora_v2',
     ],
     [
       'prints only the first path segment',
-      'postgresql://u:p@localhost:5433/gadget_dev/extra',
-      'localhost:5433/gadget_dev',
+      'postgresql://u:p@localhost:5433/fatoora_v2/extra',
+      'localhost:5433/fatoora_v2',
     ],
     ['redacts a suspicious path and drops the port', LEAKY, 'u/(redacted)'],
   ])('%s', (_label, input, expected) => {

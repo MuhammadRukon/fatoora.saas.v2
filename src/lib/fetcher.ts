@@ -7,6 +7,8 @@
  * - Throws a typed `ApiClientError` on non-2xx responses so React Query's
  *   `onError` and our UI can react uniformly.
  */
+import { toast } from 'sonner';
+
 import type { ApiError } from '@/contracts/common';
 
 export class ApiClientError extends Error {
@@ -20,6 +22,13 @@ export class ApiClientError extends Error {
     this.payload = payload;
   }
 }
+
+/** The server's message for API errors, otherwise the fallback (network failures etc. stay generic). */
+export const apiErrorMessage = (err: unknown, fallback: string): string =>
+  err instanceof ApiClientError ? err.message : fallback;
+
+/** onError handler for mutations: toast the API message, or the fallback. */
+export const errorToast = (fallback: string) => (err: unknown) => toast.error(apiErrorMessage(err, fallback));
 
 export interface FetcherOptions extends Omit<RequestInit, 'body'> {
   body?: unknown;

@@ -19,15 +19,16 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { setAuthHint } from '@/lib/auth-hint';
+import { safeCallbackUrl } from '@/lib/safe-redirect';
 import { credentialsSchema, type CredentialsInput } from '@/contracts/auth';
 import { AuthCard } from '@/modules/auth/components/auth-card';
 import { GoogleButton } from '@/modules/auth/components/google-button';
-import { Loader } from '@/app/common/loader/loader';
+import { Loader } from '@/components/common/loader';
 
 function LoginContent() {
   const router = useRouter();
   const params = useSearchParams();
-  const callbackUrl = params.get('callbackUrl') || '/';
+  const callbackUrl = safeCallbackUrl(params.get('callbackUrl'));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {

@@ -21,7 +21,7 @@ import { signupSchema, type SignupInput } from '@/contracts/auth';
 import { signupAction } from '@/modules/auth/actions';
 import { AuthCard } from '@/modules/auth/components/auth-card';
 import { GoogleButton } from '@/modules/auth/components/google-button';
-import { Loader } from '@/app/common/loader/loader';
+import { Loader } from '@/components/common/loader';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -111,7 +111,7 @@ export default function SignupPage() {
                   <Input
                     type="tel"
                     autoComplete="tel"
-                    placeholder="+8801XXXXXXXXX"
+                    placeholder="+9665XXXXXXXX"
                     {...field}
                     value={field.value ?? ''}
                   />

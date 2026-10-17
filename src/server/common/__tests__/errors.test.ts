@@ -3,10 +3,11 @@ import { describe, expect, it } from 'vitest';
 import {
   AppError,
   BadRequestError,
+  BusinessRequiredError,
   ConflictError,
-  TxnIdDuplicateError,
   ForbiddenError,
   NotFoundError,
+  SubscriptionRequiredError,
   UnauthorizedError,
   ValidationError,
   statusFromError,
@@ -20,11 +21,12 @@ describe('errors: statusFromError', () => {
   it('maps domain errors to HTTP status codes', () => {
     expect(statusFromError(new BadRequestError())).toBe(400);
     expect(statusFromError(new UnauthorizedError())).toBe(401);
+    expect(statusFromError(new SubscriptionRequiredError())).toBe(402);
     expect(statusFromError(new ForbiddenError())).toBe(403);
     expect(statusFromError(new NotFoundError())).toBe(404);
     expect(statusFromError(new ConflictError('dup'))).toBe(409);
+    expect(statusFromError(new BusinessRequiredError())).toBe(409);
     expect(statusFromError(new ValidationError())).toBe(422);
-    expect(statusFromError(new TxnIdDuplicateError())).toBe(409);
   });
 
   it('falls back to 500 for unknown errors', () => {
@@ -54,19 +56,7 @@ describe('errors: toJsonError', () => {
   });
 });
 
-describe('errors: TxnIdDuplicateError', () => {
-  it('is an AppError with its own code (not a ConflictError) and optional meta', () => {
-    const err = new TxnIdDuplicateError('dup', { existingOrderId: 'o1', existingOrderNumber: 'T-1' });
-    expect(err).toBeInstanceOf(AppError);
-    expect(err).not.toBeInstanceOf(ConflictError);
-    expect(err.code).toBe('TXN_ID_DUPLICATE');
-    expect(toJsonError(err)).toEqual({
-      code: 'TXN_ID_DUPLICATE',
-      message: 'dup',
-      meta: { existingOrderId: 'o1', existingOrderNumber: 'T-1' },
-    });
-  });
-
+describe('errors: ConflictError', () => {
   it('plain ConflictError keeps the CONFLICT code', () => {
     expect(new ConflictError('x').code).toBe('CONFLICT');
   });
@@ -81,9 +71,8 @@ describe('errors: single code map', () => {
   });
 
   it('each error class maps to its mapped status and wire code', () => {
-    expect(ERROR_STATUS).toMatchObject({ CONFLICT: 409, TXN_ID_DUPLICATE: 409, RATE_LIMITED: 429 });
+    expect(ERROR_STATUS).toMatchObject({ CONFLICT: 409, RATE_LIMITED: 429 });
     expect(statusFromError(new RateLimitedError(Date.now() + 5000))).toBe(429);
-    expect(toJsonError(new TxnIdDuplicateError()).code).toBe('TXN_ID_DUPLICATE');
     expect(toJsonError(new ConflictError('c', { a: 1 }))).toEqual({
       code: 'CONFLICT',
       message: 'c',

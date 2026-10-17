@@ -31,6 +31,9 @@ function verifyUrl(token: string): string {
   return `${base}/verify-email?token=${token}`;
 }
 
+/** Verification secrets may leave the server only in non-production with no mailer (local testing). */
+const exposeDevSecrets = () => process.env.NODE_ENV !== 'production' && !mailerConfigured();
+
 export const authService = {
   async signup(input: SignupInput) {
     const passwordHash = await hashPassword(input.password);
@@ -41,7 +44,7 @@ export const authService = {
           name: input.name,
           phone: input.phone,
           passwordHash,
-          role: UserRole.CUSTOMER,
+          role: UserRole.USER,
         },
         select: { id: true, email: true, name: true, role: true },
       });
@@ -55,8 +58,8 @@ export const authService = {
         ...user,
         // Dev fallback (mirrors devResetUrl): expose the secrets only
         // when no mailer is configured so the flow is testable locally.
-        devCode: mailerConfigured() ? null : issued.code,
-        devVerifyToken: mailerConfigured() ? null : issued.token,
+        devCode: exposeDevSecrets() ? issued.code : null,
+        devVerifyToken: exposeDevSecrets() ? issued.token : null,
       };
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -105,8 +108,8 @@ export const authService = {
     const issued = await issueVerification(user.email);
     void sendMail(user.email, verificationEmail(issued.code, verifyUrl(issued.token)));
     return {
-      devCode: mailerConfigured() ? null : issued.code,
-      devVerifyToken: mailerConfigured() ? null : issued.token,
+      devCode: exposeDevSecrets() ? issued.code : null,
+      devVerifyToken: exposeDevSecrets() ? issued.token : null,
     };
   },
 

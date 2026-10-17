@@ -1,56 +1,70 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  applyDiscount,
-  applyPercentDiscount,
-  formatBDT,
-  takaToCents,
-} from '../money';
+import { CURRENCY, formatSAR, fromHalalas, toHalalas } from '../money';
 
-describe('money: takaToCents', () => {
-  it('rounds to nearest cent without floating drift', () => {
-    expect(takaToCents(10)).toBe(1000);
-    expect(takaToCents(0.1)).toBe(10);
-    expect(takaToCents(0.015)).toBe(2); // banker's? — Math.round → 2
+describe('money: toHalalas', () => {
+  it('rounds half-up at the third decimal without float drift', () => {
+    expect(toHalalas('10.005')).toBe(1001);
+    expect(toHalalas('10.004')).toBe(1000);
+    expect(toHalalas('1.015')).toBe(102); // parseFloat('1.015') * 100 = 101.49999...
+    expect(toHalalas('0.995')).toBe(100);
   });
 
-  it('rejects non-finite input', () => {
-    expect(() => takaToCents(NaN)).toThrow();
-    expect(() => takaToCents(Infinity)).toThrow();
-  });
-});
-
-describe('money: applyDiscount (flat)', () => {
-  it('subtracts discount but never below zero', () => {
-    expect(applyDiscount(10000, 1500)).toBe(8500);
-    expect(applyDiscount(10000, 20000)).toBe(0);
+  it('accepts whole, short and padded decimals', () => {
+    expect(toHalalas('10')).toBe(1000);
+    expect(toHalalas('10.5')).toBe(1050);
+    expect(toHalalas('.5')).toBe(50);
+    expect(toHalalas(' 3.00 ')).toBe(300);
+    expect(toHalalas('0')).toBe(0);
   });
 
-  it('returns the original price when discount is non-positive', () => {
-    expect(applyDiscount(10000, 0)).toBe(10000);
-    expect(applyDiscount(10000, -50)).toBe(10000);
-  });
-});
-
-describe('money: applyPercentDiscount', () => {
-  it('clamps percent to [0, 100]', () => {
-    expect(applyPercentDiscount(10000, 0)).toBe(0);
-    expect(applyPercentDiscount(10000, 50)).toBe(5000);
-    expect(applyPercentDiscount(10000, 200)).toBe(10000);
-    expect(applyPercentDiscount(10000, -10)).toBe(0);
+  it('accepts numbers via their shortest decimal form', () => {
+    expect(toHalalas(10)).toBe(1000);
+    expect(toHalalas(0.1)).toBe(10);
+    expect(toHalalas(10.005)).toBe(1001);
   });
 
-  it('floors fractional cents to avoid over-discounting', () => {
-    expect(applyPercentDiscount(999, 33)).toBe(329); // 329.67 → 329
+  it('rounds negatives away from zero and never returns -0', () => {
+    expect(toHalalas('-10.005')).toBe(-1001);
+    expect(Object.is(toHalalas('-0.004'), 0)).toBe(true);
+  });
+
+  it('rejects non-decimal and out-of-range input', () => {
+    for (const bad of ['', '.', '-', 'abc', '1,000', '1.2.3', '1e3']) {
+      expect(() => toHalalas(bad)).toThrow();
+    }
+    expect(() => toHalalas(NaN)).toThrow();
+    expect(() => toHalalas(Infinity)).toThrow();
+    expect(() => toHalalas(1e21)).toThrow();
+    expect(() => toHalalas('99999999999999999')).toThrow();
   });
 });
 
-describe('money: formatBDT', () => {
-  it('renders BDT amount with Tk prefix by default', () => {
-    expect(formatBDT(123456)).toMatch(/^Tk\s*1,?234\.56$/);
+describe('money: fromHalalas', () => {
+  it('renders exactly 2 decimals', () => {
+    expect(fromHalalas(150)).toBe('1.50');
+    expect(fromHalalas(5)).toBe('0.05');
+    expect(fromHalalas(0)).toBe('0.00');
+    expect(fromHalalas(123456)).toBe('1234.56');
+    expect(fromHalalas(-150)).toBe('-1.50');
   });
 
-  it('omits symbol when requested', () => {
-    expect(formatBDT(100000, { withSymbol: false })).not.toMatch(/Tk/);
+  it('rejects non-integers', () => {
+    expect(() => fromHalalas(1.5)).toThrow();
+  });
+});
+
+describe('money: formatSAR', () => {
+  it('formats en with grouping and 2 decimals', () => {
+    expect(formatSAR(123456, 'en')).toContain('1,234.56');
+    expect(formatSAR(100, 'en')).toContain('1.00');
+  });
+
+  it('formats ar with Arabic-Indic digits', () => {
+    expect(formatSAR(123456, 'ar')).toContain('١٬٢٣٤٫٥٦');
+  });
+
+  it('uses SAR', () => {
+    expect(CURRENCY).toBe('SAR');
   });
 });

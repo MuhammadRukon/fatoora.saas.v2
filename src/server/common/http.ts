@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 
 import { auth } from '@/auth';
-import { ForbiddenError, UnauthorizedError, statusFromError, toJsonError } from './errors';
+import { ForbiddenError, UnauthorizedError, errMsg, statusFromError, toJsonError } from './errors';
+import { resolveBusinessId } from '@/server/business/business-context';
+import { subscriptionsService } from '@/server/subscriptions/subscriptions.service';
 import { log } from './logger';
 import { RateLimitedError } from './rate-limit';
 
@@ -15,7 +17,7 @@ export interface SessionUser {
   id: string;
   email: string;
   name: string;
-  role: 'ADMIN' | 'CUSTOMER';
+  role: 'ADMIN' | 'USER';
 }
 
 export async function getSessionUser(): Promise<SessionUser | null> {
@@ -41,6 +43,34 @@ export async function requireAdminSession(): Promise<SessionUser> {
   return user;
 }
 
+export async function requireUserSession(): Promise<SessionUser> {
+  const user = await requireSession();
+  if (user.role !== 'USER') throw new ForbiddenError('User role required');
+  return user;
+}
+
+/** Gate for every /api/app/** route: a USER with a current ACTIVE subscription (else 402). */
+export async function requireAppSession(): Promise<{ userId: string }> {
+  const user = await requireUserSession();
+  await subscriptionsService.assertActive(user.id);
+  return { userId: user.id };
+}
+
+/** The subscription check and the business lookup run together; the subscription error (402) wins over BUSINESS_REQUIRED (409). */
+async function gatedBusinessContext(check: (userId: string) => Promise<unknown>) {
+  const user = await requireUserSession();
+  const [gate, business] = await Promise.allSettled([check(user.id), resolveBusinessId(user.id)]);
+  if (gate.status === 'rejected') throw gate.reason;
+  if (business.status === 'rejected') throw business.reason;
+  return { userId: user.id, businessId: business.value };
+}
+
+/** Gate for GET-only routes over already-issued records (also lets an EXPIRED subscription read) + the business. */
+export const requireBusinessReadContext = () => gatedBusinessContext((id) => subscriptionsService.assertReadable(id));
+
+/** requireAppSession + the business the request is scoped to (409 BUSINESS_REQUIRED if none). */
+export const requireBusinessContext = () => gatedBusinessContext((id) => subscriptionsService.assertActive(id));
+
 export function jsonError(err: unknown): NextResponse {
   if (err instanceof RateLimitedError) {
     return NextResponse.json(
@@ -60,7 +90,7 @@ export function jsonError(err: unknown): NextResponse {
   }
   const status = statusFromError(err);
   if (status >= 500) {
-    log.error('http.unhandled', { error: err instanceof Error ? err.message : String(err) });
+    log.error('http.unhandled', { error: errMsg(err) });
   }
   return NextResponse.json(toJsonError(err), { status });
 }

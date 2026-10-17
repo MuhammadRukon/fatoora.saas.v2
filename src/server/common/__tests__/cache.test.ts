@@ -255,17 +255,17 @@ describe('helpers', () => {
 
   it('buildKey prefixes with env, read at call time', () => {
     vi.stubEnv('VERCEL_ENV', 'production');
-    expect(buildKey('cat', 'list')).toBe('gw:production:cat:list');
+    expect(buildKey('cat', 'list')).toBe('fatoora:production:cat:list');
     vi.stubEnv('VERCEL_ENV', 'preview');
-    expect(buildKey('cat', 1)).toBe('gw:preview:cat:1');
+    expect(buildKey('cat', 1)).toBe('fatoora:preview:cat:1');
   });
 
   it('buildKey never shares the production namespace with a local build', () => {
     vi.stubEnv('VERCEL_ENV', '');
     vi.stubEnv('NODE_ENV', 'production');
     delete process.env.VERCEL_ENV;
-    expect(buildKey('a')).toBe('gw:local:a');
+    expect(buildKey('a')).toBe('fatoora:local:a');
     vi.stubEnv('NODE_ENV', 'test');
-    expect(buildKey('a')).toBe('gw:test:a');
+    expect(buildKey('a')).toBe('fatoora:test:a');
   });
 });

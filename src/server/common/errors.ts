@@ -34,6 +34,12 @@ export class UnauthorizedError extends AppError {
   }
 }
 
+export class SubscriptionRequiredError extends AppError {
+  constructor(message = 'An active subscription is required') {
+    super('SUBSCRIPTION_REQUIRED', message);
+  }
+}
+
 export class ForbiddenError extends AppError {
   constructor(message = 'Forbidden') {
     super('FORBIDDEN', message);
@@ -52,16 +58,10 @@ export class ConflictError extends AppError {
   }
 }
 
-/**
- * A customer transaction id is already attached to another payment (409, with
- * its own code so clients can show specific copy). Not a ConflictError: the
- * code, not the class, is what the wire and the UI key on. Customer-facing
- * throws carry no `meta`; admin throws carry
- * `{ existingOrderId, existingOrderNumber }`.
- */
-export class TxnIdDuplicateError extends AppError {
-  constructor(message = 'Transaction ID already exists', meta?: Record<string, unknown>) {
-    super('TXN_ID_DUPLICATE', message, meta);
+/** The user has no business profile yet (the app redirects to /app/business?setup=1). */
+export class BusinessRequiredError extends AppError {
+  constructor(message = 'Create your business profile first') {
+    super('BUSINESS_REQUIRED', message);
   }
 }
 
@@ -70,6 +70,9 @@ export class ValidationError extends AppError {
     super('VALIDATION_ERROR', message, meta);
   }
 }
+
+/** Message of any thrown value, for logs. */
+export const errMsg = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 export function statusFromError(err: unknown): number {
   return err instanceof AppError ? ERROR_STATUS[err.code] : 500;
